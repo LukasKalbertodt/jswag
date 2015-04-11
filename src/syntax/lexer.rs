@@ -1,42 +1,56 @@
 use std::str::Chars;
 use std::iter::{Iterator};
 use super::token::*;
+use diagnostics::ErrorHandler;
+use filemap::FileMap;
+use std::rc::Rc;
 
 
 #[derive(Debug, Clone)]
 pub struct TokenSpan {
     pub tok: Token,
     /// Byte position, half open: inclusive-exclusive
-    pub span: (i64, i64),
-    pub line: i64,
+    pub span: (u64, u64),
+    pub line: u64,
 }
 
 
 pub struct Tokenizer<'a> {
+    fmap: Rc<FileMap>,
     chs: Chars<'a>,
 
-    line_breaks: Vec<i64>,
+    // line_breaks: Vec<i64>,
+
+    diag: &'a ErrorHandler,
 
     last: Option<char>,
     curr: Option<char>,
     peek: Option<char>,
-    curr_pos: i64,
-    peek_pos: i64,
+    /// Byte offset of the last character read (curr)
+    last_pos: u64,
+    /// Byte offset of the next character to read (peek)
+    curr_pos: u64,
+
+    fatal: bool,
 }
 
 impl<'a> Tokenizer<'a> {
     /// Creates a new Tokenizer from a string.
-    pub fn new(content: &'a String) -> Tokenizer<'a> {
-        let iter = content.chars();
+    pub fn new(fmap: &'a Rc<FileMap>, diag: &'a ErrorHandler) -> Tokenizer<'a> {
+        let iter = fmap.src.chars();
         let mut tok = Tokenizer {
             chs: iter,
-            line_breaks: Vec::new(),
+            fmap: fmap.clone(),
+            // line_breaks: Vec::new(),
+            diag: diag,
             last: None,
             curr: None,
             peek: None,
-            curr_pos: -1,
-            peek_pos: -1,
+            last_pos: 0,
+            curr_pos: 0,
+            fatal: false,
         };
+        // tok.chs = tok.fmap.src.chars();
         tok.dbump();
         tok
     }
@@ -49,12 +63,12 @@ impl<'a> Tokenizer<'a> {
 
         // Check if the last char is a line break and add to break list
         if self.last.unwrap_or('x') == '\n' {
-            self.line_breaks.push(self.curr_pos);
+            self.fmap.add_line(self.curr_pos);
         }
 
-        self.curr_pos = self.peek_pos;
+        self.last_pos = self.curr_pos;
         match self.peek {
-            Some(c) => self.peek_pos += c.len_utf8() as i64,
+            Some(c) => self.curr_pos += c.len_utf8() as u64,
             _ => {}
         };
 
@@ -71,6 +85,11 @@ impl<'a> Tokenizer<'a> {
         while is_whitespace(self.curr.unwrap_or('x')) {
             self.bump();
         }
+    }
+
+    fn fatal(&mut self, m: &str) {
+        self.diag.error(m);
+        self.fatal = true;
     }
 
     /// Calls `bump` until the first char after the comment is reached. Skips
@@ -130,7 +149,10 @@ impl<'a> Tokenizer<'a> {
         loop {
             match self.curr {
                 Some(c) if c == '"' && self.last.unwrap() != '\\' => break,
-                None => break,  // TODO: This should not happen!
+                None => {
+                    self.fatal("Unexpected EOF while parsing string literal");
+                    break;
+                },
                 Some(c) => {
                     s.push(c);
                     self.bump();
@@ -260,10 +282,14 @@ impl<'a> Iterator for Tokenizer<'a> {
         // println!("{:?}", self.line_breaks);
         // panic!("yolo");
 
+        if self.fatal {
+            return None;
+        }
+
         Some(TokenSpan {
             tok: t,
             span: (before_pos, self.curr_pos),
-            line: (self.line_breaks.len() as i64) + 1,
+            line: (self.fmap.num_lines() as u64) + 1,
         })
 
 

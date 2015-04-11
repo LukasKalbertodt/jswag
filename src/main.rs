@@ -2,41 +2,33 @@ extern crate term;
 
 
 use std::path::Path;
-use std::fs::File;
 use std::error::Error;
-use std::io::Read;
+use filemap::open_file;
+use diagnostics::ErrorHandler;
 
 
 mod syntax;
+mod diagnostics;
+mod filemap;
 
+
+macro_rules! colored {
+    ($t:ident, $c:ident, $p:expr ) => ({
+        $t.fg(term::color::$c).unwrap();
+        $p;
+        $t.reset().unwrap();
+    })
+}
 
 fn main() {
-    let path = Path::new("Quersumme.java");
-    let mut file = match File::open(path) {
-        Err(e) => panic!("Could not open '{}': {}", path.display(),
-            e.description()),
-        Ok(file) => file,
+    let filemap = match open_file(Path::new("Quersumme.java")) {
+        Err(e) => panic!("Error opening file: {}", e.description()),
+        Ok(fmap) => fmap,
     };
 
-    // Read the file contents into a string, returns `IoResult<String>`
-    let mut s = String::new();
-    match file.read_to_string(&mut s) {
-        Err(e) => panic!("Could not read '{}': {}", path.display(),
-            e.description()),
-        // Ok(_) => println!("'{}' contains:\n{}", path.display(), s),
-        Ok(_) => {},
-    }
+    let error_handler = ErrorHandler::new(filemap.clone());
 
-    macro_rules! colored {
-        ($t:ident, $c:ident, $p:expr ) => ({
-            $t.fg(term::color::$c).unwrap();
-            $p;
-            $t.reset().unwrap();
-        })
-    }
-
-
-    let toks = syntax::Tokenizer::new(&s);
+    let toks = syntax::Tokenizer::new(&filemap, &error_handler);
     let reals = toks.filter(|t| t.tok.is_real());
 
     let mut t = term::stdout().unwrap();
