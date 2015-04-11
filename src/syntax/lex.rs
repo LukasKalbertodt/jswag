@@ -32,6 +32,7 @@ use std::iter::{Iterator};
 pub enum Token {
     // Keyword(Keyword),
     Whitespace,
+    Comment,
     Other(String),
 }
 
@@ -57,7 +58,9 @@ pub struct Tokenizer<'a> {
     chs: Chars<'a>,
 
     curr: Option<char>,
-    byte_pos: i64,
+    peek: Option<char>,
+    curr_pos: i64,
+    peek_pos: i64,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -66,16 +69,21 @@ impl<'a> Tokenizer<'a> {
         let mut tok = Tokenizer {
             chs: iter,
             curr: None,
-            byte_pos: -1,
+            peek: None,
+            curr_pos: -1,
+            peek_pos: -1,
         };
+        tok.bump();
         tok.bump();
         tok
     }
 
     fn bump(&mut self) {
-        self.curr = self.chs.next();
-        match self.curr {
-            Some(c) => self.byte_pos += c.len_utf8() as i64,
+        self.curr = self.peek;
+        self.curr_pos = self.peek_pos;
+        self.peek = self.chs.next();
+        match self.peek {
+            Some(c) => self.peek_pos += c.len_utf8() as i64,
             _ => {}
         };
     }
@@ -85,13 +93,41 @@ impl<'a> Tokenizer<'a> {
             self.bump();
         }
     }
+
+    fn skip_comment(&mut self) {
+        // We know curr == '/' and peek is either '*' or '/'.
+        // Note: `self.peek.is_some()` implies `self.curr.is_some()`
+        if self.peek.unwrap() == '*' {
+            while self.peek.is_some() &&
+                !(self.curr.unwrap() == '*' && self.peek.unwrap() == '/') {
+                self.bump();
+            }
+            self.bump();
+            self.bump();
+        } else {
+            while self.curr.is_some() && self.curr.unwrap() != '\n' {
+                self.bump();
+            }
+            self.bump();
+        }
+    }
+
+    fn scan_word(&mut self) -> String {
+        let mut s = String::new();
+        // Break if its whitespace or None (whitespace in that case)
+        while !is_whitespace(self.curr.unwrap_or(' ')) {
+            s.push(self.curr.unwrap());
+            self.bump();
+        }
+        s
+    }
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
     type Item = TokenSpan;
 
     fn next(&mut self) -> Option<TokenSpan> {
-        let before_pos = self.byte_pos;
+        let before_pos = self.curr_pos;
 
         match self.curr {
             None => None,
@@ -99,20 +135,30 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.skip_whitespace();
                 Some(TokenSpan {
                     tok: Token::Whitespace,
-                    span: (before_pos, self.byte_pos)
+                    span: (before_pos, self.curr_pos)
                 })
             },
-            Some(_) => {
-                let mut s = String::new();
-                // Break if its whitespace or None (whitespace in that case)
-                while !is_whitespace(self.curr.unwrap_or(' ')) {
-                    s.push(self.curr.unwrap());
-                    self.bump();
+            Some(c) if c == '/' => {
+                match self.peek {
+                    Some(c) if c == '/' || c == '*' => {
+                        self.skip_comment();
+                        Some(TokenSpan {
+                            tok: Token::Comment,
+                            span: (before_pos, self.curr_pos),
+                        })
+                    },
+                    _ => {
+                        Some(TokenSpan {
+                            tok: Token::Other(self.scan_word()),
+                            span: (before_pos, self.curr_pos),
+                        })
+                    }
                 }
-
+            },
+            Some(_) => {
                 Some(TokenSpan {
-                    tok: Token::Other(s),
-                    span: (before_pos, self.byte_pos),
+                    tok: Token::Other(self.scan_word()),
+                    span: (before_pos, self.curr_pos),
                 })
             }
         }

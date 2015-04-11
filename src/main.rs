@@ -28,6 +28,8 @@ fn main() {
     let test = r#"
 /******* Quersumme.java  *****/
 import AlgoTools.IO;
+// We need stuff
+class
     "#.to_string();
 
     let toks = syntax::Tokenizer::new(&test);
