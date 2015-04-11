@@ -266,6 +266,33 @@ impl<'a> Iterator for Tokenizer<'a> {
             '{' => { self.bump(); Token::OpenDelim(DelimToken::Brace) },
             '}' => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
 
+            '=' if p == '=' => { self.dbump(); Token::EqEq },
+            '=' => { self.bump(); Token::Eq },
+            '!' if p == '=' => { self.dbump(); Token::Ne },
+            '!' => { self.bump(); Token::Not },
+            '<' if p == '=' => { self.dbump(); Token::Le },
+            '<' if p == '<' => {
+                self.dbump();
+                self.bump();
+                if self.last.unwrap_or('x') == '=' {
+                    Token::BinOpEq(BinOpToken::Shl)
+                } else {
+                    Token::BinOp(BinOpToken::Shl)
+                }
+            },
+            '<' => { self.bump(); Token::Lt },
+            '>' if p == '=' => { self.dbump(); Token::Ge },
+            '>' if p == '>' => {
+                self.dbump();
+                self.bump();
+                if self.last.unwrap_or('x') == '=' {
+                    Token::BinOpEq(BinOpToken::Shl)
+                } else {
+                    Token::BinOp(BinOpToken::Shl)
+                }
+            },
+            '>' => { self.bump(); Token::Gt },
+
             '+' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Plus)},
             '+' => { self.bump(); Token::BinOp(BinOpToken::Plus)},
             '-' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Minus)},
@@ -279,27 +306,12 @@ impl<'a> Iterator for Tokenizer<'a> {
             '^' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Caret)},
             '^' => { self.bump(); Token::BinOp(BinOpToken::Caret)},
             '&' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::And)},
+            '&' if p == '&' => { self.dbump(); Token::AndAnd },
             '&' => { self.bump(); Token::BinOp(BinOpToken::And)},
             '|' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Or)},
+            '|' if p == '|' => { self.dbump(); Token::OrOr },
             '|' => { self.bump(); Token::BinOp(BinOpToken::Or)},
-            '<' if p == '<' => {
-                self.dbump();
-                self.bump();
-                if self.last.unwrap_or('x') == '=' {
-                    Token::BinOpEq(BinOpToken::Shl)
-                } else {
-                    Token::BinOp(BinOpToken::Shl)
-                }
-            },
-            '>' if p == '>' => {
-                self.dbump();
-                self.bump();
-                if self.last.unwrap_or('x') == '=' {
-                    Token::BinOpEq(BinOpToken::Shl)
-                } else {
-                    Token::BinOp(BinOpToken::Shl)
-                }
-            },
+            '~' => { self.bump(); Token::Tilde }
 
             '"' => Token::Literal(Lit::Str(self.scan_string_literal())),
             '0' ... '9' => Token::Literal(Lit::Integer(self.scan_integer_literal())),

@@ -84,6 +84,17 @@ pub enum Token {
     Semi,
 
     // Operators
+    Eq,
+    Lt,
+    Le,
+    EqEq,
+    Ne,
+    Ge,
+    Gt,
+    AndAnd,
+    OrOr,
+    Not,
+    Tilde,
     BinOp(BinOpToken),
     BinOpEq(BinOpToken),
 
