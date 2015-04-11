@@ -47,7 +47,8 @@ impl Token {
 #[derive(Debug)]
 pub struct TokenSpan {
     pub tok: Token,
-    // pub span: (i64, i64),
+    /// Byte position, half open: inclusive-exclusive
+    pub span: (i64, i64),
 }
 
 
@@ -56,6 +57,7 @@ pub struct Tokenizer<'a> {
     chs: Chars<'a>,
 
     curr: Option<char>,
+    byte_pos: i64,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -64,14 +66,18 @@ impl<'a> Tokenizer<'a> {
         let mut tok = Tokenizer {
             chs: iter,
             curr: None,
+            byte_pos: -1,
         };
         tok.bump();
         tok
     }
 
     fn bump(&mut self) {
-        let ch = self.chs.next();
-        self.curr = ch;
+        self.curr = self.chs.next();
+        match self.curr {
+            Some(c) => self.byte_pos += c.len_utf8() as i64,
+            _ => {}
+        };
     }
 
     fn skip_whitespace(&mut self) {
@@ -85,11 +91,16 @@ impl<'a> Iterator for Tokenizer<'a> {
     type Item = TokenSpan;
 
     fn next(&mut self) -> Option<TokenSpan> {
+        let before_pos = self.byte_pos;
+
         match self.curr {
             None => None,
             Some(c) if is_whitespace(c) => {
                 self.skip_whitespace();
-                Some(TokenSpan { tok: Token::Whitespace })
+                Some(TokenSpan {
+                    tok: Token::Whitespace,
+                    span: (before_pos, self.byte_pos)
+                })
             },
             Some(_) => {
                 let mut s = String::new();
@@ -99,7 +110,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                     self.bump();
                 }
 
-                Some(TokenSpan { tok: Token::Other(s) })
+                Some(TokenSpan {
+                    tok: Token::Other(s),
+                    span: (before_pos, self.byte_pos),
+                })
             }
         }
 
