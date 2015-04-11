@@ -1,94 +1,21 @@
-
 use std::str::Chars;
 use std::iter::{Iterator};
+use super::token::*;
 
-macro_rules! declare_keywords {(
-    $( ($name:ident, $word:expr); )*
-) => {
-    #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-    pub enum Keyword {
-        $( $name, )*
-    }
 
-    impl Keyword {
-        // pub fn word(&self) -> &'static str {
-        //     match *self {
-        //         $( Keyword::$name => $word, )*
-        //     }
-        // }
-
-        pub fn from_str(s: &String) -> Option<Self> {
-            match &**s {
-                $( $word => Some(Keyword::$name), )*
-                _ => None,
-            }
-        }
-    }
-}}
-
-declare_keywords! {
-    (Public,        "public");
-    (Private,       "private");
-    (Protected,     "protected");
-    (Class,         "class");
-    (Static,        "static");
-    (Import,        "import");
-
-    // control structures
-    (Do,     "do");
-    (While,  "while");
-    (For,    "for");
-    (If,     "if");
-    (Else,   "else");
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DelimToken {
-    Paren,      // round ( )
-    Bracket,    // square [ ]
-    Brace,      // curly { }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Lit {
-    Str(String),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Token {
-    Keyword(Keyword),
-    Whitespace(bool),
-    Comment,
-    Dot,
-    Comma,
-    Semi,
-    OpenDelim(DelimToken),
-    CloseDelim(DelimToken),
-    Literal(Lit),
-    Word(String),
-    Other(String),
-}
-
-impl Token {
-    pub fn is_real(&self) -> bool {
-        match *self {
-            Token::Whitespace(false) | Token::Comment => false,
-            _ => true,
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenSpan {
     pub tok: Token,
     /// Byte position, half open: inclusive-exclusive
     pub span: (i64, i64),
+    // pub line: i64,
 }
-
 
 
 pub struct Tokenizer<'a> {
     chs: Chars<'a>,
+
+    // line_breaks: Vec<i64>,
 
     last: Option<char>,
     curr: Option<char>,
@@ -98,46 +25,56 @@ pub struct Tokenizer<'a> {
 }
 
 impl<'a> Tokenizer<'a> {
+    /// Creates a new Tokenizer from a string.
     pub fn new(content: &'a String) -> Tokenizer<'a> {
         let iter = content.chars();
         let mut tok = Tokenizer {
             chs: iter,
+            // line_breaks: Vec::new(),
             last: None,
             curr: None,
             peek: None,
             curr_pos: -1,
             peek_pos: -1,
         };
-        tok.bump();
-        tok.bump();
+        tok.dbump();
         tok
     }
 
+    /// Reads a new char from the iterator, updating last, curr and peek + pos
     fn bump(&mut self) {
         self.last = self.curr;
         self.curr = self.peek;
-        self.curr_pos = self.peek_pos;
         self.peek = self.chs.next();
+
+        self.curr_pos = self.peek_pos;
         match self.peek {
             Some(c) => self.peek_pos += c.len_utf8() as i64,
             _ => {}
         };
     }
 
+    /// Calls `bump` twice. For less typing.
+    fn dbump(&mut self) {
+        self.bump();
+        self.bump();
+    }
+
+    /// Calls `bump` until the first non-whitespace char is reached. Returns
+    /// true if any newline char was skipped
     fn skip_whitespace(&mut self) -> bool {
         let mut newline_found = false;
         while is_whitespace(self.curr.unwrap_or('x')) {
             if self.curr.unwrap_or('x') == '\n' && !newline_found {
                 newline_found = true;
             }
-            // else if newline_found {
-            //     break;
-            // }
             self.bump();
         }
         newline_found
     }
 
+    /// Calls `bump` until the first char after the comment is reached. Skips
+    /// `/* */` and `//` comments.
     fn skip_comment(&mut self) {
         // We know curr == '/' and peek is either '*' or '/'.
         // Note: `self.peek.is_some()` implies `self.curr.is_some()`
@@ -146,13 +83,11 @@ impl<'a> Tokenizer<'a> {
                 !(self.curr.unwrap() == '*' && self.peek.unwrap() == '/') {
                 self.bump();
             }
-            self.bump();
-            self.bump();
+            self.dbump();   // skip last two chars
         } else {
             while self.curr.is_some() && self.curr.unwrap() != '\n' {
                 self.bump();
             }
-            self.bump();
         }
     }
 

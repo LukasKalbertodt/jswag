@@ -1,3 +1,5 @@
-pub mod lex;
+mod lexer;
+mod token;
 
-pub use self::lex::*;
+pub use self::token::*;
+pub use self::lexer::*;

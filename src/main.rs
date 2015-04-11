@@ -27,14 +27,6 @@ fn main() {
         Ok(_) => {},
     }
 
-    // let test = r#"
-// /******* Quersumme.java  *****/
-// import AlgoTools.IO;
-// // We need stuff
-// public class Quersumme {
-// }
-//     "#.to_string();
-
     macro_rules! colored {
         ($t:ident, $c:ident, $p:expr ) => ({
             $t.fg(term::color::$c).unwrap();
