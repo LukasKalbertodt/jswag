@@ -2,53 +2,69 @@
 use std::str::Chars;
 use std::iter::{Iterator};
 
-// macro_rules! declare_keywords {(
-//     $( ($name:ident, $word:expr); )*
-// ) => {
-//     #[derive(Copy, Clone, PartialEq, Eq)]
-//     pub enum Keyword {
-//         $( $name, )*
-//     }
+macro_rules! declare_keywords {(
+    $( ($name:ident, $word:expr); )*
+) => {
+    #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+    pub enum Keyword {
+        $( $name, )*
+    }
 
-//     impl Keyword {
-//         pub fn word(&self) -> &'static str {
-//             match *self {
-//                 $( Keyword::$name => $word, )*
-//             }
-//         }
-//     }
-// }}
+    impl Keyword {
+        // pub fn word(&self) -> &'static str {
+        //     match *self {
+        //         $( Keyword::$name => $word, )*
+        //     }
+        // }
 
-// declare_keywords! {
-//     (Public,        "public");
-//     (Private,       "private");
-//     (Protected,     "protected");
-//     (Class,         "class");
-//     (Static,        "static");
-// }
+        pub fn from_str(s: &String) -> Option<Self> {
+            match &**s {
+                $( $word => Some(Keyword::$name), )*
+                _ => None,
+            }
+        }
+    }
+}}
 
-#[derive(Debug, Clone)]
+declare_keywords! {
+    (Public,        "public");
+    (Private,       "private");
+    (Protected,     "protected");
+    (Class,         "class");
+    (Static,        "static");
+    (Import,        "import");
+
+    // control structures
+    (Do,     "do");
+    (While,  "while");
+    (For,    "for");
+    (If,     "if");
+    (Else,   "else");
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DelimToken {
     Paren,      // round ( )
     Bracket,    // square [ ]
     Brace,      // curly { }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
-    // Keyword(Keyword),
-    Whitespace,
+    Keyword(Keyword),
+    Whitespace(bool),
     Comment,
     Dot,
     OpenDelim(DelimToken),
     CloseDelim(DelimToken),
+    Word(String),
     Other(String),
 }
 
 impl Token {
     pub fn is_real(&self) -> bool {
         match *self {
-            Token::Whitespace => false,
+            Token::Whitespace(false) | Token::Comment => false,
             _ => true,
         }
     }
@@ -97,10 +113,18 @@ impl<'a> Tokenizer<'a> {
         };
     }
 
-    fn skip_whitespace(&mut self) {
-        while self.curr.is_some() && is_whitespace(self.curr.unwrap()) {
+    fn skip_whitespace(&mut self) -> bool {
+        let mut newline_found = false;
+        while is_whitespace(self.curr.unwrap_or('x')) {
+            if self.curr.unwrap_or('x') == '\n' && !newline_found {
+                newline_found = true;
+            }
+            // else if newline_found {
+            //     break;
+            // }
             self.bump();
         }
+        newline_found
     }
 
     fn skip_comment(&mut self) {
@@ -157,32 +181,36 @@ impl<'a> Iterator for Tokenizer<'a> {
 
     fn next(&mut self) -> Option<TokenSpan> {
         let before_pos = self.curr_pos;
+        let p = self.peek.unwrap_or('\x00');
 
         if self.curr.is_none() {
             return None;
         }
 
-        let t = match (self.curr.unwrap(), self.peek.unwrap_or('\x00')) {
-            (c, _) if is_whitespace(c) => {
-                self.skip_whitespace();
-                Token::Whitespace
+        let t = match self.curr.unwrap() {
+            c if is_whitespace(c) => {
+                Token::Whitespace(self.skip_whitespace())
             },
-            ('/', '/') | ('/', '*') => {
+            '/' if p == '/' || p == '*' => {
                 self.skip_comment();
                 Token::Comment
             },
-            ('.', _) => {
+            '.' => {
                 self.bump();
                 Token::Dot
             },
-            ('(', _) => { self.bump(); Token::OpenDelim(DelimToken::Paren) },
-            (')', _) => { self.bump(); Token::CloseDelim(DelimToken::Paren) },
-            ('[', _) => { self.bump(); Token::OpenDelim(DelimToken::Bracket) },
-            (']', _) => { self.bump(); Token::CloseDelim(DelimToken::Bracket) },
-            ('{', _) => { self.bump(); Token::OpenDelim(DelimToken::Brace) },
-            ('}', _) => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
-            (c, _) if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') => {
-                Token::Other(self.scan_real())
+            '(' => { self.bump(); Token::OpenDelim(DelimToken::Paren) },
+            ')' => { self.bump(); Token::CloseDelim(DelimToken::Paren) },
+            '[' => { self.bump(); Token::OpenDelim(DelimToken::Bracket) },
+            ']' => { self.bump(); Token::CloseDelim(DelimToken::Bracket) },
+            '{' => { self.bump(); Token::OpenDelim(DelimToken::Brace) },
+            '}' => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
+            'a' ... 'z' | 'A'... 'Z' => {
+                let w = self.scan_real();
+                match Keyword::from_str(&w) {
+                    Some(kw) => Token::Keyword(kw),
+                    None => Token::Word(w),
+                }
             },
             _ => Token::Other(self.scan_string()),
         };
