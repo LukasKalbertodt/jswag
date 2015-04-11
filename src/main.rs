@@ -37,21 +37,24 @@ fn main() {
 
 
     let toks = syntax::Tokenizer::new(&s);
-    let reals = toks.filter(|t| t.tok.is_real());
+    let reals = toks.filter(|t| t.tok.is_real() || true);
 
     let mut t = term::stdout().unwrap();
 
-    let mut c = 1;
-    colored!(t, BLUE, (print!("{:>2}: ", c)));
+    let mut old_line = 0;
     for tok in reals {
-        if tok.tok == syntax::Token::Whitespace(true) {
-            println!("");
-            c += 1;
-            colored!(t, BLUE, (print!("{:>2}: ", c)));
-        } else {
-            print!("{:?}", tok.tok);
-            colored!(t, YELLOW, print!("_"));
+        // printing line prefix
+        if tok.line > old_line {
+            for i in old_line .. tok.line {
+                println!("");
+                colored!(t, BLUE, (print!("{:>2}: ", i + 1)));
+            }
+            old_line = tok.line;
         }
+
+        print!("{:?}", tok.tok);
+        colored!(t, YELLOW, print!("_"));
+
     }
     // let tok = tokenizer.next().unwrap();
     // loop {

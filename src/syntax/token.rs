@@ -60,7 +60,7 @@ pub enum Lit {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     // Ignored tokens
-    Whitespace(bool),   // true if it contains a newline
+    Whitespace,
     Comment,
 
     // Simple one char tokens
@@ -80,9 +80,10 @@ pub enum Token {
 }
 
 impl Token {
+    // Returns true if the token is not an ignored token (whitespace/comment)
     pub fn is_real(&self) -> bool {
         match *self {
-            Token::Whitespace(false) | Token::Comment => false,
+            Token::Whitespace | Token::Comment => false,
             _ => true,
         }
     }

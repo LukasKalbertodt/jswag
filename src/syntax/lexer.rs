@@ -8,14 +8,14 @@ pub struct TokenSpan {
     pub tok: Token,
     /// Byte position, half open: inclusive-exclusive
     pub span: (i64, i64),
-    // pub line: i64,
+    pub line: i64,
 }
 
 
 pub struct Tokenizer<'a> {
     chs: Chars<'a>,
 
-    // line_breaks: Vec<i64>,
+    line_breaks: Vec<i64>,
 
     last: Option<char>,
     curr: Option<char>,
@@ -30,7 +30,7 @@ impl<'a> Tokenizer<'a> {
         let iter = content.chars();
         let mut tok = Tokenizer {
             chs: iter,
-            // line_breaks: Vec::new(),
+            line_breaks: Vec::new(),
             last: None,
             curr: None,
             peek: None,
@@ -47,11 +47,17 @@ impl<'a> Tokenizer<'a> {
         self.curr = self.peek;
         self.peek = self.chs.next();
 
+        // Check if the last char is a line break and add to break list
+        if self.last.unwrap_or('x') == '\n' {
+            self.line_breaks.push(self.curr_pos);
+        }
+
         self.curr_pos = self.peek_pos;
         match self.peek {
             Some(c) => self.peek_pos += c.len_utf8() as i64,
             _ => {}
         };
+
     }
 
     /// Calls `bump` twice. For less typing.
@@ -60,17 +66,11 @@ impl<'a> Tokenizer<'a> {
         self.bump();
     }
 
-    /// Calls `bump` until the first non-whitespace char is reached. Returns
-    /// true if any newline char was skipped
-    fn skip_whitespace(&mut self) -> bool {
-        let mut newline_found = false;
+    /// Calls `bump` until the first non-whitespace char is reached.
+    fn skip_whitespace(&mut self) {
         while is_whitespace(self.curr.unwrap_or('x')) {
-            if self.curr.unwrap_or('x') == '\n' && !newline_found {
-                newline_found = true;
-            }
             self.bump();
         }
-        newline_found
     }
 
     /// Calls `bump` until the first char after the comment is reached. Skips
@@ -154,7 +154,8 @@ impl<'a> Iterator for Tokenizer<'a> {
 
         let t = match self.curr.unwrap() {
             c if is_whitespace(c) => {
-                Token::Whitespace(self.skip_whitespace())
+                self.skip_whitespace();
+                Token::Whitespace
             },
             '/' if p == '/' || p == '*' => {
                 self.skip_comment();
@@ -183,9 +184,13 @@ impl<'a> Iterator for Tokenizer<'a> {
             _ => Token::Other(self.scan_string()),
         };
 
+        // println!("{:?}", self.line_breaks);
+        // panic!("yolo");
+
         Some(TokenSpan {
             tok: t,
-            span: (before_pos, self.curr_pos)
+            span: (before_pos, self.curr_pos),
+            line: (self.line_breaks.len() as i64) + 1,
         })
 
 
