@@ -55,6 +55,7 @@ pub enum DelimToken {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Lit {
     Str(String),
+    Integer(String)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

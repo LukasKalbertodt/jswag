@@ -122,6 +122,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn scan_string_literal(&mut self) -> String {
+        // TODO: Escape shit
         // `curr` is '"'. Note: After one bump, `last` != None
         self.bump();
 
@@ -137,6 +138,77 @@ impl<'a> Tokenizer<'a> {
             }
         }
         self.bump();    // Remove last '"'
+        s
+    }
+
+    /// Scans a Java integer literal and returns it as a String. Parsing the
+    /// string as a number cannot be done at this point.
+    /// There are three types of integer literals in Java:
+    /// * `26`: Decimal
+    /// * `0x1a`: Hex
+    /// * `0b11010`: Binary
+    /// All types can have an 'l' or 'L' suffix (-> type long, int otherwise)
+    fn scan_integer_literal(&mut self) -> String {
+        // `curr` is '0' ... '9' here.
+
+        let mut s = String::new();
+
+        match self.peek {
+            Some(c) if (c == 'x' || c == 'X') && self.curr.unwrap() == '0' => {
+                s.push('0');
+                s.push(c);
+                self.dbump();
+
+                loop {
+                    match self.curr {
+                        Some(c) => match c {
+                            '0' ... '9' | 'a' ... 'f' | 'A' ... 'F' => {
+                                s.push(c);
+                                self.bump();
+                            },
+                            _ => break,
+                        },
+                        _ => break,
+                    }
+                }
+            },
+            Some(c) if (c == 'b' || c == 'B') && self.curr.unwrap() == '0' => {
+                s.push('0');
+                s.push(c);
+                self.dbump();
+
+                loop {
+                    match self.curr {
+                        Some(c) if c == '0' || c == '1' => {
+                            s.push(c);
+                            self.bump();
+                        },
+                        _ => break,
+                    }
+                }
+            },
+            // `peek` can actually be anything, e.g. ';' or ' ', even None
+            _ => {
+                loop {
+                    match self.curr {
+                        Some(c) => match c {
+                            '0' ... '9' => {
+                                s.push(c);
+                                self.bump();
+                            },
+                            _ => break,
+                        },
+                        _ => break,
+                    }
+                }
+            },
+        }
+
+        match self.curr {
+            Some(c) if c == 'l' || c == 'L' => s.push(c),
+            _ => {},
+        };
+
         s
     }
 }
@@ -173,6 +245,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '}' => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
 
             '"' => Token::Literal(Lit::Str(self.scan_string_literal())),
+            '0' ... '9' => Token::Literal(Lit::Integer(self.scan_integer_literal())),
 
             'a' ... 'z' | 'A'... 'Z' => {
                 let w = self.scan_real();

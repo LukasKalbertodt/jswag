@@ -37,7 +37,7 @@ fn main() {
 
 
     let toks = syntax::Tokenizer::new(&s);
-    let reals = toks.filter(|t| t.tok.is_real() || true);
+    let reals = toks.filter(|t| t.tok.is_real());
 
     let mut t = term::stdout().unwrap();
 
@@ -56,17 +56,5 @@ fn main() {
         colored!(t, YELLOW, print!("_"));
 
     }
-    // let tok = tokenizer.next().unwrap();
-    // loop {
-    //     match tok.ty {
-    //         syntax::TokenType::Other(ref s) => println!("{}", s),
-    //         _ => {},
-    //     }
-
-    //     let tok = match tokenizer.next() {
-    //         None => break,
-    //         Some(t) => t,
-    //     };
-    // }
     println!("");
 }
