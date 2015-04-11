@@ -174,6 +174,10 @@ impl<'a> Tokenizer<'a> {
         }
         s
     }
+
+    // fn scan_string_literal(&mut self) -> String {
+
+    // }
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
@@ -205,6 +209,9 @@ impl<'a> Iterator for Tokenizer<'a> {
             ']' => { self.bump(); Token::CloseDelim(DelimToken::Bracket) },
             '{' => { self.bump(); Token::OpenDelim(DelimToken::Brace) },
             '}' => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
+
+            // '"' =>
+
             'a' ... 'z' | 'A'... 'Z' => {
                 let w = self.scan_real();
                 match Keyword::from_str(&w) {

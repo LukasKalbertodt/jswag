@@ -1,8 +1,10 @@
+extern crate term;
+
+
 use std::path::Path;
 use std::fs::File;
 use std::error::Error;
 use std::io::Read;
-
 
 
 mod syntax;
@@ -33,13 +35,30 @@ fn main() {
 // }
 //     "#.to_string();
 
+    macro_rules! colored {
+        ($t:ident, $c:ident, $p:expr ) => ({
+            $t.fg(term::color::$c).unwrap();
+            $p;
+            $t.reset().unwrap();
+        })
+    }
+
+
     let toks = syntax::Tokenizer::new(&s);
     let reals = toks.filter(|t| t.tok.is_real());
+
+    let mut t = term::stdout().unwrap();
+
+    let mut c = 1;
+    colored!(t, BLUE, (print!("{:>2}: ", c)));
     for tok in reals {
         if tok.tok == syntax::Token::Whitespace(true) {
             println!("");
+            c += 1;
+            colored!(t, BLUE, (print!("{:>2}: ", c)));
         } else {
-            print!("{:?}   ", tok.tok);
+            print!("{:?}", tok.tok);
+            colored!(t, YELLOW, print!("_"));
         }
     }
     // let tok = tokenizer.next().unwrap();
