@@ -46,6 +46,20 @@ declare_keywords! {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BinOpToken {
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Caret,
+    And,
+    Or,
+    Shl,
+    Shr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DelimToken {
     Paren,      // round ( )
     Bracket,    // square [ ]
@@ -68,6 +82,10 @@ pub enum Token {
     Dot,
     Comma,
     Semi,
+
+    // Operators
+    BinOp(BinOpToken),
+    BinOpEq(BinOpToken),
 
     // Long string tokens
     Keyword(Keyword),

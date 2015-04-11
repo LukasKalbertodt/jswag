@@ -266,6 +266,41 @@ impl<'a> Iterator for Tokenizer<'a> {
             '{' => { self.bump(); Token::OpenDelim(DelimToken::Brace) },
             '}' => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
 
+            '+' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Plus)},
+            '+' => { self.bump(); Token::BinOp(BinOpToken::Plus)},
+            '-' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Minus)},
+            '-' => { self.bump(); Token::BinOp(BinOpToken::Minus)},
+            '*' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Star)},
+            '*' => { self.bump(); Token::BinOp(BinOpToken::Star)},
+            '/' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Slash)},
+            '/' => { self.bump(); Token::BinOp(BinOpToken::Slash)},
+            '%' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Percent)},
+            '%' => { self.bump(); Token::BinOp(BinOpToken::Percent)},
+            '^' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Caret)},
+            '^' => { self.bump(); Token::BinOp(BinOpToken::Caret)},
+            '&' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::And)},
+            '&' => { self.bump(); Token::BinOp(BinOpToken::And)},
+            '|' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Or)},
+            '|' => { self.bump(); Token::BinOp(BinOpToken::Or)},
+            '<' if p == '<' => {
+                self.dbump();
+                self.bump();
+                if self.last.unwrap_or('x') == '=' {
+                    Token::BinOpEq(BinOpToken::Shl)
+                } else {
+                    Token::BinOp(BinOpToken::Shl)
+                }
+            },
+            '>' if p == '>' => {
+                self.dbump();
+                self.bump();
+                if self.last.unwrap_or('x') == '=' {
+                    Token::BinOpEq(BinOpToken::Shl)
+                } else {
+                    Token::BinOp(BinOpToken::Shl)
+                }
+            },
+
             '"' => Token::Literal(Lit::Str(self.scan_string_literal())),
             '0' ... '9' => Token::Literal(Lit::Integer(self.scan_integer_literal())),
 
