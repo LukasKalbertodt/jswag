@@ -1,6 +1,6 @@
 
 use std::str::Chars;
-use std::iter::Iterator;
+use std::iter::{Iterator};
 
 // macro_rules! declare_keywords {(
 //     $( ($name:ident, $word:expr); )*
@@ -28,11 +28,20 @@ use std::iter::Iterator;
 // }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Token {
     // Keyword(Keyword),
     Whitespace,
     Other(String),
+}
+
+impl Token {
+    pub fn is_real(&self) -> bool {
+        match *self {
+            Token::Whitespace => false,
+            _ => true,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -40,6 +49,8 @@ pub struct TokenSpan {
     pub tok: Token,
     // pub span: (i64, i64),
 }
+
+
 
 pub struct Tokenizer<'a> {
     chs: Chars<'a>,

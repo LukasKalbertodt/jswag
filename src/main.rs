@@ -25,14 +25,11 @@ fn main() {
         Ok(_) => {},
     }
 
-    let test = r#"apfel birne
-
-/******************************  Quersumme.java  *************************/
-
+    let test = r#"/******* Quersumme.java  *****/
 import AlgoTools.IO;"#.to_string();
 
     let tokenizer = syntax::Tokenizer::new(&test);
-    for tok in tokenizer {
+    for tok in tokenizer.filter(|t| t.tok.is_real() ) {
         println!("{:?}", tok);
     }
     // let tok = tokenizer.next().unwrap();
