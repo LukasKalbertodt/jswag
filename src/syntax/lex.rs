@@ -50,13 +50,21 @@ pub enum DelimToken {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Lit {
+    Str(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Keyword(Keyword),
     Whitespace(bool),
     Comment,
     Dot,
+    Comma,
+    Semi,
     OpenDelim(DelimToken),
     CloseDelim(DelimToken),
+    Literal(Lit),
     Word(String),
     Other(String),
 }
@@ -82,6 +90,7 @@ pub struct TokenSpan {
 pub struct Tokenizer<'a> {
     chs: Chars<'a>,
 
+    last: Option<char>,
     curr: Option<char>,
     peek: Option<char>,
     curr_pos: i64,
@@ -93,6 +102,7 @@ impl<'a> Tokenizer<'a> {
         let iter = content.chars();
         let mut tok = Tokenizer {
             chs: iter,
+            last: None,
             curr: None,
             peek: None,
             curr_pos: -1,
@@ -104,6 +114,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn bump(&mut self) {
+        self.last = self.curr;
         self.curr = self.peek;
         self.curr_pos = self.peek_pos;
         self.peek = self.chs.next();
@@ -175,9 +186,24 @@ impl<'a> Tokenizer<'a> {
         s
     }
 
-    // fn scan_string_literal(&mut self) -> String {
+    fn scan_string_literal(&mut self) -> String {
+        // `curr` is '"'. Note: After one bump, `last` != None
+        self.bump();
 
-    // }
+        let mut s = String::new();
+        loop {
+            match self.curr {
+                Some(c) if c == '"' && self.last.unwrap() != '\\' => break,
+                None => break,  // TODO: This should not happen!
+                Some(c) => {
+                    s.push(c);
+                    self.bump();
+                },
+            }
+        }
+        self.bump();    // Remove last '"'
+        s
+    }
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
@@ -199,10 +225,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.skip_comment();
                 Token::Comment
             },
-            '.' => {
-                self.bump();
-                Token::Dot
-            },
+            '.' => { self.bump(); Token::Dot },
+            ',' => { self.bump(); Token::Comma },
+            ';' => { self.bump(); Token::Semi },
+
             '(' => { self.bump(); Token::OpenDelim(DelimToken::Paren) },
             ')' => { self.bump(); Token::CloseDelim(DelimToken::Paren) },
             '[' => { self.bump(); Token::OpenDelim(DelimToken::Bracket) },
@@ -210,7 +236,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '{' => { self.bump(); Token::OpenDelim(DelimToken::Brace) },
             '}' => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
 
-            // '"' =>
+            '"' => Token::Literal(Lit::Str(self.scan_string_literal())),
 
             'a' ... 'z' | 'A'... 'Z' => {
                 let w = self.scan_real();
