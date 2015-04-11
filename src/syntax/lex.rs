@@ -28,15 +28,18 @@ use std::iter::Iterator;
 // }
 
 
-// pub enum TokenType {
-//     Keyword(Keyword),
-//     Other(String),
-// }
+#[derive(Debug)]
+pub enum Token {
+    // Keyword(Keyword),
+    Whitespace,
+    Other(String),
+}
 
-// pub struct Token {
-//     pub ty: TokenType,
-//     pub span: (i64, i64),
-// }
+#[derive(Debug)]
+pub struct TokenSpan {
+    pub tok: Token,
+    // pub span: (i64, i64),
+}
 
 pub struct Tokenizer<'a> {
     chs: Chars<'a>,
@@ -68,26 +71,28 @@ impl<'a> Tokenizer<'a> {
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
-    type Item = String;
+    type Item = TokenSpan;
 
-    fn next(&mut self) -> Option<String> {
-        self.skip_whitespace();
+    fn next(&mut self) -> Option<TokenSpan> {
+        match self.curr {
+            None => None,
+            Some(c) if is_whitespace(c) => {
+                self.skip_whitespace();
+                Some(TokenSpan { tok: Token::Whitespace })
+            },
+            Some(_) => {
+                let mut s = String::new();
+                // Break if its whitespace or None (whitespace in that case)
+                while !is_whitespace(self.curr.unwrap_or(' ')) {
+                    s.push(self.curr.unwrap());
+                    self.bump();
+                }
 
-        if self.curr.is_none() {
-            return None;
+                Some(TokenSpan { tok: Token::Other(s) })
+            }
         }
 
-        let mut s = String::new();
-        while self.curr.is_some() && !is_whitespace(self.curr.unwrap()) {
-            s.push(self.curr.unwrap());
-            self.bump();
-        }
 
-        // let last = self.curr;
-        // self.bump();
-        // last
-
-        Some(s)
 
 
         // match self.curr {

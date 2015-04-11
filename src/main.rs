@@ -25,11 +25,15 @@ fn main() {
         Ok(_) => {},
     }
 
-    let test = "Hello Cheese!".to_string();
+    let test = r#"apfel birne
+
+/******************************  Quersumme.java  *************************/
+
+import AlgoTools.IO;"#.to_string();
 
     let tokenizer = syntax::Tokenizer::new(&test);
-    for c in tokenizer {
-        print!("{}_", c);
+    for tok in tokenizer {
+        println!("{:?}", tok);
     }
     // let tok = tokenizer.next().unwrap();
     // loop {
