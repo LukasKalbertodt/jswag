@@ -27,12 +27,21 @@ use std::iter::{Iterator};
 //     (Static,        "static");
 // }
 
+#[derive(Debug, Clone)]
+pub enum DelimToken {
+    Paren,      // round ( )
+    Bracket,    // square [ ]
+    Brace,      // curly { }
+}
 
 #[derive(Debug, Clone)]
 pub enum Token {
     // Keyword(Keyword),
     Whitespace,
     Comment,
+    Dot,
+    OpenDelim(DelimToken),
+    CloseDelim(DelimToken),
     Other(String),
 }
 
@@ -112,11 +121,31 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    fn scan_word(&mut self) -> String {
+    fn scan_real(&mut self) -> String {
         let mut s = String::new();
         // Break if its whitespace or None (whitespace in that case)
-        while !is_whitespace(self.curr.unwrap_or(' ')) {
-            s.push(self.curr.unwrap());
+        loop {
+            match self.curr.unwrap_or(' ') {
+                'a' ... 'z' | 'A' ... 'Z' => {
+                    s.push(self.curr.unwrap());
+                },
+                _ => break,
+            }
+            self.bump();
+        }
+        s
+    }
+
+    fn scan_string(&mut self) -> String {
+        let mut s = String::new();
+        // Break if its whitespace or None (whitespace in that case)
+        loop {
+            match self.curr.unwrap_or(' ') {
+                c if is_whitespace(c) => break,
+                c => {
+                    s.push(c);
+                },
+            }
             self.bump();
         }
         s
@@ -129,41 +158,39 @@ impl<'a> Iterator for Tokenizer<'a> {
     fn next(&mut self) -> Option<TokenSpan> {
         let before_pos = self.curr_pos;
 
-        match self.curr {
-            None => None,
-            Some(c) if is_whitespace(c) => {
-                self.skip_whitespace();
-                Some(TokenSpan {
-                    tok: Token::Whitespace,
-                    span: (before_pos, self.curr_pos)
-                })
-            },
-            Some(c) if c == '/' => {
-                match self.peek {
-                    Some(c) if c == '/' || c == '*' => {
-                        self.skip_comment();
-                        Some(TokenSpan {
-                            tok: Token::Comment,
-                            span: (before_pos, self.curr_pos),
-                        })
-                    },
-                    _ => {
-                        Some(TokenSpan {
-                            tok: Token::Other(self.scan_word()),
-                            span: (before_pos, self.curr_pos),
-                        })
-                    }
-                }
-            },
-            Some(_) => {
-                Some(TokenSpan {
-                    tok: Token::Other(self.scan_word()),
-                    span: (before_pos, self.curr_pos),
-                })
-            }
+        if self.curr.is_none() {
+            return None;
         }
 
+        let t = match (self.curr.unwrap(), self.peek.unwrap_or('\x00')) {
+            (c, _) if is_whitespace(c) => {
+                self.skip_whitespace();
+                Token::Whitespace
+            },
+            ('/', '/') | ('/', '*') => {
+                self.skip_comment();
+                Token::Comment
+            },
+            ('.', _) => {
+                self.bump();
+                Token::Dot
+            },
+            ('(', _) => { self.bump(); Token::OpenDelim(DelimToken::Paren) },
+            (')', _) => { self.bump(); Token::CloseDelim(DelimToken::Paren) },
+            ('[', _) => { self.bump(); Token::OpenDelim(DelimToken::Bracket) },
+            (']', _) => { self.bump(); Token::CloseDelim(DelimToken::Bracket) },
+            ('{', _) => { self.bump(); Token::OpenDelim(DelimToken::Brace) },
+            ('}', _) => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
+            (c, _) if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') => {
+                Token::Other(self.scan_real())
+            },
+            _ => Token::Other(self.scan_string()),
+        };
 
+        Some(TokenSpan {
+            tok: t,
+            span: (before_pos, self.curr_pos)
+        })
 
 
         // match self.curr {

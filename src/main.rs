@@ -29,11 +29,12 @@ fn main() {
 /******* Quersumme.java  *****/
 import AlgoTools.IO;
 // We need stuff
-class
+public class Quersumme {
+}
     "#.to_string();
 
     let toks = syntax::Tokenizer::new(&test);
-    let reals = toks.filter(|t| t.tok.is_real() || true);
+    let reals = toks.filter(|t| t.tok.is_real());
     for tok in reals {
         println!("{:?}", tok);
     }
