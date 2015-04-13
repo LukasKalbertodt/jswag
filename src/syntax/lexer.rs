@@ -2,16 +2,15 @@ use std::str::Chars;
 use std::iter::{Iterator};
 use super::token::*;
 use diagnostics::ErrorHandler;
-use filemap::FileMap;
+use filemap::{FileMap, Span, SrcIndex};
 use std::rc::Rc;
 
 
 #[derive(Debug, Clone)]
 pub struct TokenSpan {
     pub tok: Token,
-    /// Byte position, half open: inclusive-exclusive
-    pub span: (u64, u64),
-    pub line: u64,
+    /// Byte position of token in Filemap
+    pub span: Span,
 }
 
 
@@ -27,11 +26,11 @@ pub struct Tokenizer<'a> {
     curr: Option<char>,
     peek: Option<char>,
     /// Byte offset of the last character read (curr)
-    last_pos: u64,
+    last_pos: SrcIndex,
     /// Byte offset of the next character to read (peek)
-    curr_pos: u64,
+    curr_pos: SrcIndex,
     /// Byte offset when parsing the current token started
-    token_start: u64,
+    token_start: SrcIndex,
 
     fatal: bool,
 }
@@ -71,7 +70,7 @@ impl<'a> Tokenizer<'a> {
 
         self.last_pos = self.curr_pos;
         match self.peek {
-            Some(c) => self.curr_pos += c.len_utf8() as u64,
+            Some(c) => self.curr_pos += c.len_utf8(),
             _ => {}
         };
 
@@ -96,7 +95,7 @@ impl<'a> Tokenizer<'a> {
     // }
 
     fn fatal_span(&mut self, m: &str) {
-        self.diag.error_span((self.token_start, self.curr_pos), m);
+        self.diag.error_span(Span { lo: self.token_start, hi: self.curr_pos}, m);
         self.fatal = true;
     }
 
@@ -343,19 +342,8 @@ impl<'a> Iterator for Tokenizer<'a> {
 
         Some(TokenSpan {
             tok: t,
-            span: (self.token_start, self.curr_pos),
-            line: (self.fmap.num_lines() as u64) + 1,
+            span: Span { lo: self.token_start, hi: self.curr_pos },
         })
-
-
-        // match self.curr {
-        //     Some(_) => Some(Token {
-        //         ty: TokenType::Other(s),
-        //         span: (0, 0),
-        //     }),
-        //     None => None,
-        // }
-        // self.chs.next()
     }
 }
 

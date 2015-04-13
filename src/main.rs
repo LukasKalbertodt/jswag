@@ -33,22 +33,20 @@ fn main() {
 
     let mut t = term::stdout().unwrap();
 
-    let mut old_line = 0;
+    // let mut old_line = 0;
     for tok in reals {
         // printing line prefix
-        if tok.line > old_line {
-            for i in old_line .. tok.line {
-                println!("");
-                colored!(t, BLUE, (print!("{:>2}: ", i + 1)));
-            }
-            old_line = tok.line;
-        }
+        // let new_line = filemap.get_loc(tok.span.lo).line;
+        // if new_line > old_line {
+        //     for i in old_line .. new_line {
+        //         println!("");
+        //         colored!(t, BLUE, (print!("{:>2}: ", i + 1)));
+        //     }
+        //     old_line = new_line;
+        // }
 
         print!("{:?}", tok.tok);
-        colored!(t, GREEN, print!("["));
-        // print!("{:?}", filemap.get_loc(tok.span.0));
-        colored!(t, GREEN, print!("]"));
-        colored!(t, YELLOW, print!("_"));
+        colored!(t, BLUE, print!("|"));
 
     }
     println!("");
