@@ -1,4 +1,4 @@
-use filemap::{FileMap, Span, SrcIndex};
+use filemap::{FileMap, Span, Loc};
 use std::rc::Rc;
 use term;
 
@@ -22,43 +22,49 @@ macro_rules! attrib {
     })
 }
 
+#[allow(dead_code)]
 impl ErrorHandler {
     pub fn new(fmap: Rc<FileMap>) -> ErrorHandler {
         ErrorHandler { fmap: fmap }
     }
 
-    // pub fn error(&self, m: &str) {
-    //     println!("");
-    //     print!("{}: ", self.fmap.filename);
-    //     colored!(RED, print!("error: "));
-    //     attrib!(Bold, println!("{}", m));
-    // }
+    pub fn error(&self, m: &str) {
+        println!("");
+        print!("{}: ", self.fmap.filename);
+        colored!(RED, print!("error: "));
+        attrib!(Bold, println!("{}", m));
+    }
 
-    fn mark_line(&self, line_idx: SrcIndex, span: Span) {
-        let pre = format!("{}:{}", self.fmap.filename, line_idx);
+    fn print_snippet(&self, start: Loc, end: Loc) {
+        if start.line == end.line {
+            let pre = format!("{}:{}: ", self.fmap.filename, start.line);
 
-        println!("{}: {}", pre, self.fmap.get_line(line_idx));
+            println!("{}{}", pre, self.fmap.get_line(start.line));
 
-        // spaces(pre.len());
-        print!("{pre:>prepad$} {start:>startpad$}",
-            pre=" ", prepad=pre.len() + 1,
-            start=" ", startpad=span.lo as usize);
+            // Print spaces until the span start is reached
+            print!("{0:>1$}", " ", pre.len() + start.col);
 
-        colored!(YELLOW, println!("{0:-<1$}", "^", (span.hi-span.lo+2) as usize));
+            colored!(YELLOW, println!("{0:-<1$}", "^", (end.col-start.col+2)));
+        } else {
+            for line in start.line .. end.line + 1 {
+                let pre = format!("{}:{}: ", self.fmap.filename, line);
+                println!("{}{}", pre, self.fmap.get_line(line));
+            }
+        }
     }
 
     pub fn error_span(&self, span: Span, m: &str) {
-        let startloc = self.fmap.get_loc(span.lo);
-        let endloc = self.fmap.get_loc(span.hi - 1);
+        let start = self.fmap.get_loc(span.lo);
+        let end = self.fmap.get_loc(span.hi - 1);
 
         println!("");
         print!("{}:{}:{} .. {}:{}: ", self.fmap.filename,
-            startloc.line, startloc.col,
-            endloc.line, endloc.col);
+            start.line, start.col,
+            end.line, end.col);
         colored!(RED, print!("error: "));
         attrib!(Bold, println!("{}", m));
 
-        self.mark_line(startloc.line, Span { lo: startloc.col, hi: endloc.col });
+        self.print_snippet(start, end);
 
     }
 }

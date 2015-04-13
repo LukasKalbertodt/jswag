@@ -43,9 +43,9 @@ impl FileMap {
         lines.push(offset);
     }
 
-    pub fn num_lines(&self) -> usize {
-        self.lines.borrow().len()
-    }
+    // pub fn num_lines(&self) -> usize {
+    //     self.lines.borrow().len()
+    // }
 
     fn get_line_idx(&self, offset: SrcIndex) -> SrcIndex {
         let l = self.lines.borrow();
