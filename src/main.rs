@@ -45,6 +45,9 @@ fn main() {
         }
 
         print!("{:?}", tok.tok);
+        colored!(t, GREEN, print!("["));
+        // print!("{:?}", filemap.get_loc(tok.span.0));
+        colored!(t, GREEN, print!("]"));
         colored!(t, YELLOW, print!("_"));
 
     }

@@ -30,6 +30,8 @@ pub struct Tokenizer<'a> {
     last_pos: u64,
     /// Byte offset of the next character to read (peek)
     curr_pos: u64,
+    /// Byte offset when parsing the current token started
+    token_start: u64,
 
     fatal: bool,
 }
@@ -48,6 +50,7 @@ impl<'a> Tokenizer<'a> {
             peek: None,
             last_pos: 0,
             curr_pos: 0,
+            token_start: 0,
             fatal: false,
         };
         // tok.chs = tok.fmap.src.chars();
@@ -87,8 +90,13 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    fn fatal(&mut self, m: &str) {
-        self.diag.error(m);
+    // fn fatal(&mut self, m: &str) {
+    //     self.diag.error(m);
+    //     self.fatal = true;
+    // }
+
+    fn fatal_span(&mut self, m: &str) {
+        self.diag.error_span((self.token_start, self.curr_pos), m);
         self.fatal = true;
     }
 
@@ -150,7 +158,7 @@ impl<'a> Tokenizer<'a> {
             match self.curr {
                 Some(c) if c == '"' && self.last.unwrap() != '\\' => break,
                 None => {
-                    self.fatal("Unexpected EOF while parsing string literal");
+                    self.fatal_span("Unexpected EOF while lexing string literal");
                     break;
                 },
                 Some(c) => {
@@ -239,7 +247,7 @@ impl<'a> Iterator for Tokenizer<'a> {
     type Item = TokenSpan;
 
     fn next(&mut self) -> Option<TokenSpan> {
-        let before_pos = self.curr_pos;
+        self.token_start = self.curr_pos;
         let p = self.peek.unwrap_or('\x00');
 
         if self.curr.is_none() {
@@ -335,7 +343,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
         Some(TokenSpan {
             tok: t,
-            span: (before_pos, self.curr_pos),
+            span: (self.token_start, self.curr_pos),
             line: (self.fmap.num_lines() as u64) + 1,
         })
 
