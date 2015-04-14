@@ -1,11 +1,16 @@
 use filemap::{FileMap, Span, Loc};
 use std::rc::Rc;
+use std::iter::repeat;
 use term_painter::ToStyle;
 use term_painter::Color::*;
 use term_painter::Attr::*;
 
 pub struct ErrorHandler {
     fmap: Rc<FileMap>,
+}
+
+fn times(s: &str, rhs: usize) -> String {
+    repeat(s).take(rhs).collect()
 }
 
 // macro_rules! colored {
@@ -48,11 +53,9 @@ impl ErrorHandler {
             // Print spaces until the span start is reached
             print!("{0:>1$}", " ", pre.len() + start.col);
 
-            print!("{}", Yellow.paint("^"));
-            for _ in 0..(end.col-start.col+1) {
-                print!("{}", Yellow.paint("-"));
-            }
-            println!("");
+            println!("{}{}", Yellow.paint("^"),
+                Yellow.paint(times("-", end.col-start.col+1)));
+
         } else {
             for line in start.line .. end.line + 1 {
                 println!("{}:{}: {}",
