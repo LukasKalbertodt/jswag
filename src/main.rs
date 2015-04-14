@@ -1,4 +1,4 @@
-extern crate term;
+extern crate term_painter;
 
 
 use std::path::Path;
@@ -12,13 +12,13 @@ mod diagnostics;
 mod filemap;
 
 
-macro_rules! colored {
-    ($t:ident, $c:ident, $p:expr ) => ({
-        $t.fg(term::color::$c).unwrap();
-        $p;
-        $t.reset().unwrap();
-    })
-}
+// macro_rules! colored {
+//     ($t:ident, $c:ident, $p:expr ) => ({
+//         $t.fg(term::color::$c).unwrap();
+//         $p;
+//         $t.reset().unwrap();
+//     })
+// }
 
 fn main() {
     let filemap = match open_file(Path::new("Quersumme.java")) {
@@ -31,7 +31,7 @@ fn main() {
     let toks = syntax::Tokenizer::new(&filemap, &error_handler);
     let reals = toks.filter(|t| t.tok.is_real());
 
-    let mut t = term::stdout().unwrap();
+    // let mut t = term::stdout().unwrap();
 
     // let mut old_line = 0;
     for tok in reals {
@@ -46,7 +46,7 @@ fn main() {
         // }
 
         print!("{:?}", tok.tok);
-        colored!(t, BLUE, print!("|"));
+        // colored!(t, BLUE, print!("|"));
 
     }
     println!("");

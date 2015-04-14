@@ -1,26 +1,28 @@
 use filemap::{FileMap, Span, Loc};
 use std::rc::Rc;
-use term;
+use term_painter::ToStyle;
+use term_painter::Color::*;
+use term_painter::Attr::*;
 
 pub struct ErrorHandler {
     fmap: Rc<FileMap>,
 }
 
-macro_rules! colored {
-    ($c:ident, $p:expr ) => ({
-        term::stdout().unwrap().fg(term::color::$c).unwrap();
-        $p;
-        term::stdout().unwrap().reset().unwrap();
-    })
-}
+// macro_rules! colored {
+//     ($c:ident, $p:expr ) => ({
+//         term::stdout().unwrap().fg(term::color::$c).unwrap();
+//         $p;
+//         term::stdout().unwrap().reset().unwrap();
+//     })
+// }
 
-macro_rules! attrib {
-    ($a:ident, $p:expr ) => ({
-        term::stdout().unwrap().attr(term::Attr::$a).unwrap();
-        $p;
-        term::stdout().unwrap().reset().unwrap();
-    })
-}
+// macro_rules! attrib {
+//     ($a:ident, $p:expr ) => ({
+//         term::stdout().unwrap().attr(term::Attr::$a).unwrap();
+//         $p;
+//         term::stdout().unwrap().reset().unwrap();
+//     })
+// }
 
 #[allow(dead_code)]
 impl ErrorHandler {
@@ -30,25 +32,33 @@ impl ErrorHandler {
 
     pub fn error(&self, m: &str) {
         println!("");
-        print!("{}: ", self.fmap.filename);
-        colored!(RED, print!("error: "));
-        attrib!(Bold, println!("{}", m));
+        print!("{}: {} {}",
+            self.fmap.filename, Red.paint("error:"), Bold.paint(m));
     }
 
     fn print_snippet(&self, start: Loc, end: Loc) {
         if start.line == end.line {
             let pre = format!("{}:{}: ", self.fmap.filename, start.line);
 
-            println!("{}{}", pre, self.fmap.get_line(start.line));
+            println!("{}:{}: {}",
+                self.fmap.filename,
+                Blue.paint(start.line),
+                self.fmap.get_line(start.line));
 
             // Print spaces until the span start is reached
             print!("{0:>1$}", " ", pre.len() + start.col);
 
-            colored!(YELLOW, println!("{0:-<1$}", "^", (end.col-start.col+2)));
+            print!("{}", Yellow.paint("^"));
+            for _ in 0..(end.col-start.col+1) {
+                print!("{}", Yellow.paint("-"));
+            }
+            println!("");
         } else {
             for line in start.line .. end.line + 1 {
-                let pre = format!("{}:{}: ", self.fmap.filename, line);
-                println!("{}{}", pre, self.fmap.get_line(line));
+                println!("{}:{}: {}",
+                    self.fmap.filename,
+                    Blue.paint(line),
+                    self.fmap.get_line(line));
             }
         }
     }
@@ -58,11 +68,11 @@ impl ErrorHandler {
         let end = self.fmap.get_loc(span.hi - 1);
 
         println!("");
-        print!("{}:{}:{} .. {}:{}: ", self.fmap.filename,
-            start.line, start.col,
-            end.line, end.col);
-        colored!(RED, print!("error: "));
-        attrib!(Bold, println!("{}", m));
+        println!("{file}:{sl}:{sc} .. {el}:{ec}: {error} {m}",
+            file=self.fmap.filename,
+            sl=Blue.paint(start.line), sc=start.col,
+            el=Blue.paint(end.line), ec=end.col,
+            error=Red.paint("error:"), m=Bold.paint(m));
 
         self.print_snippet(start, end);
 

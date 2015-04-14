@@ -30,5 +30,3 @@ public class Quersumme {
   }
 }
 import "blaaa
-sdfsdfsd
-sfsdf

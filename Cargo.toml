@@ -4,4 +4,4 @@ version = "0.0.1"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 
 [dependencies]
-term = "*"
+term-painter = "*"
