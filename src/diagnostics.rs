@@ -1,6 +1,6 @@
 use filemap::{FileMap, Span, Loc};
 use std::rc::Rc;
-use std::iter::repeat;
+// use std::iter::repeat;
 use term_painter::ToStyle;
 use term_painter::Color::*;
 use term_painter::Attr::*;
@@ -9,24 +9,8 @@ pub struct ErrorHandler {
     fmap: Rc<FileMap>,
 }
 
-fn times(s: &str, rhs: usize) -> String {
-    repeat(s).take(rhs).collect()
-}
-
-// macro_rules! colored {
-//     ($c:ident, $p:expr ) => ({
-//         term::stdout().unwrap().fg(term::color::$c).unwrap();
-//         $p;
-//         term::stdout().unwrap().reset().unwrap();
-//     })
-// }
-
-// macro_rules! attrib {
-//     ($a:ident, $p:expr ) => ({
-//         term::stdout().unwrap().attr(term::Attr::$a).unwrap();
-//         $p;
-//         term::stdout().unwrap().reset().unwrap();
-//     })
+// fn times(s: &str, rhs: usize) -> String {
+//     repeat(s).take(rhs).collect()
 // }
 
 #[allow(dead_code)]
@@ -53,8 +37,9 @@ impl ErrorHandler {
             // Print spaces until the span start is reached
             print!("{0:>1$}", " ", pre.len() + start.col);
 
-            println!("{}{}", Yellow.paint("^"),
-                Yellow.paint(times("-", end.col-start.col+1)));
+            Yellow.with(|| {
+                println!("{:-<1$}", "^", end.col-start.col+2);
+            });
 
         } else {
             for line in start.line .. end.line + 1 {

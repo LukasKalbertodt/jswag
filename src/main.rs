@@ -5,20 +5,12 @@ use std::path::Path;
 use std::error::Error;
 use filemap::open_file;
 use diagnostics::ErrorHandler;
-
+use term_painter::{Color, ToStyle};
 
 mod syntax;
 mod diagnostics;
 mod filemap;
 
-
-// macro_rules! colored {
-//     ($t:ident, $c:ident, $p:expr ) => ({
-//         $t.fg(term::color::$c).unwrap();
-//         $p;
-//         $t.reset().unwrap();
-//     })
-// }
 
 fn main() {
     let filemap = match open_file(Path::new("Quersumme.java")) {
@@ -45,7 +37,7 @@ fn main() {
         //     old_line = new_line;
         // }
 
-        print!("{:?}", tok.tok);
+        print!("{:?}{}", tok.tok, Color::Blue.paint("|"));
         // colored!(t, BLUE, print!("|"));
 
     }
