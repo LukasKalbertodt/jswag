@@ -94,7 +94,7 @@ impl<'a> Parser<'a> {
             }
 
             match try!(self.curr()).tok {
-                Token::BinOp(BinOpToken::Star) => {
+                Token::Star => {
                     self.bump();
                     try!(self.eat(Token::Semi));
                     return Ok(ast::Import::Wildcard(name));
@@ -104,9 +104,7 @@ impl<'a> Parser<'a> {
                     w = s;
                 },
                 f @ _ => return Err(self.err_unexpected(
-                    &[Token::BinOp(BinOpToken::Star),
-                        Token::Word("".to_string())],
-                    f)),
+                    &[Token::Star, Token::Word("".to_string())], f)),
             }
         }
     }
@@ -182,7 +180,7 @@ impl<'a> Parser<'a> {
     fn err_unexpected(&self, expected: &[Token], found: Token) -> PErr {
         let list = expected.iter().enumerate()
             .fold(String::new(), |mut list, (idx, ref t)| {
-            list.push_str(t.as_java_string());
+            list.push_str(&*format!("`{}`", t.as_java_string()));
             if idx < expected.len() - 2 {
                 list.push_str(", ");
             } else if idx == expected.len() - 2 {
@@ -192,7 +190,7 @@ impl<'a> Parser<'a> {
         });
 
         self.e.span_err(self.curr.clone().unwrap().span,
-            format!("Unexpected token: Expected {}, found {}",
+            format!("Unexpected token: Expected {}, found `{}`",
                 list, found.as_java_string()).as_ref());
         PErr::Fatal
     }

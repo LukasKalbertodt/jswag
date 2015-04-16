@@ -12,11 +12,11 @@ macro_rules! declare_keywords {(
 
     impl Keyword {
         /// Returns the java string of the keyword
-        // pub fn word(&self) -> &'static str {
-        //     match *self {
-        //         $( Keyword::$name => $word, )*
-        //     }
-        // }
+        pub fn as_java_string(&self) -> &'static str {
+            match *self {
+                $( Keyword::$name => $word, )*
+            }
+        }
 
         /// Returns the enum variant corresponding to the given string
         /// or None if the string does no represent a valid keyword.
@@ -72,6 +72,7 @@ pub enum Lit {
     Integer(String)
 }
 
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     // Ignored tokens
@@ -95,13 +96,32 @@ pub enum Token {
     OrOr,
     Not,
     Tilde,
-    BinOp(BinOpToken),
-    BinOpEq(BinOpToken),
+
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Caret,
+    And,
+    Or,
+    Shl,
+    Shr,
+
+    PlusEq,
+    MinusEq,
+    StarEq,
+    SlashEq,
+    PercentEq,
+    CaretEq,
+    AndEq,
+    OrEq,
+    ShlEq,
+    ShrEq,
 
     // Long string tokens
     Keyword(Keyword),
     Word(String),
-    Other(String),
 
     Literal(Lit),
 
@@ -118,27 +138,67 @@ impl Token {
         }
     }
 
-    pub fn as_java_string(&self) -> &str {
-        match *self {
+    pub fn as_java_string(&self) -> String {
+        match self.clone() {
             Token::Whitespace => "'whitespace'",
             Token::Comment => "'comment'",
 
-            Token::Dot => "'.'",
-            Token::Comma => "','",
-            Token::Semi => "';'",
+            Token::Dot => ".",
+            Token::Comma => ",",
+            Token::Semi => ";",
 
-            Token::Eq => "'='",
-            Token::Lt => "'<'",
-            Token::Le => "'<='",
-            Token::EqEq => "'=='",
-            Token::Ne => "'!='",
-            Token::Ge => "'>='",
-            Token::Gt => "'>'",
-            Token::AndAnd => "'&&'",
-            Token::OrOr => "'||'",
-            Token::Not => "'!'",
-            Token::Tilde => "'~'",
-            _ => "'???'",
-        }
+            Token::Eq => "=",
+            Token::Lt => "<",
+            Token::Le => "<=",
+            Token::EqEq => "==",
+            Token::Ne => "!=",
+            Token::Ge => ">=",
+            Token::Gt => ">",
+            Token::AndAnd => "&&",
+            Token::OrOr => "||",
+            Token::Not => "!",
+            Token::Tilde => "~",
+
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Star => "*",
+            Token::Slash => "/",
+            Token::Percent => "%",
+            Token::Caret => "^",
+            Token::And => "&",
+            Token::Or => "|",
+            Token::Shl => "<<",
+            Token::Shr => ">>",
+
+            Token::PlusEq => "+=",
+            Token::MinusEq => "-=",
+            Token::StarEq => "*=",
+            Token::SlashEq => "/=",
+            Token::PercentEq => "%=",
+            Token::CaretEq => "^=",
+            Token::AndEq => "&=",
+            Token::OrEq => "|=",
+            Token::ShlEq => "<<=",
+            Token::ShrEq => ">>=",
+
+            Token::Keyword(keyword) => keyword.as_java_string(),
+            // Token::Word(ref w) => format!("Word('{}')", w).as_str() ,
+            Token::Word(ref w) => w.as_ref(),
+
+            Token::Literal(..) => "Lit(???)",
+
+            Token::OpenDelim(delim) => match delim {
+                DelimToken::Brace => "{",
+                DelimToken::Paren => "(",
+                DelimToken::Bracket => "[",
+            },
+            Token::CloseDelim(delim) => match delim {
+                DelimToken::Brace => "}",
+                DelimToken::Paren => ")",
+                DelimToken::Bracket => "]",
+            },
+
+            // _ => "'???'",
+        }.to_string()
     }
 }

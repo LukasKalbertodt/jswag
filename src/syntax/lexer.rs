@@ -291,9 +291,9 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.dbump();
                 self.bump();
                 if self.last.unwrap_or('x') == '=' {
-                    Token::BinOpEq(BinOpToken::Shl)
+                    Token::ShlEq
                 } else {
-                    Token::BinOp(BinOpToken::Shl)
+                    Token::Shl
                 }
             },
             '<' => { self.bump(); Token::Lt },
@@ -302,31 +302,31 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.dbump();
                 self.bump();
                 if self.last.unwrap_or('x') == '=' {
-                    Token::BinOpEq(BinOpToken::Shl)
+                    Token::ShrEq
                 } else {
-                    Token::BinOp(BinOpToken::Shl)
+                    Token::Shr
                 }
             },
             '>' => { self.bump(); Token::Gt },
 
-            '+' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Plus)},
-            '+' => { self.bump(); Token::BinOp(BinOpToken::Plus)},
-            '-' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Minus)},
-            '-' => { self.bump(); Token::BinOp(BinOpToken::Minus)},
-            '*' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Star)},
-            '*' => { self.bump(); Token::BinOp(BinOpToken::Star)},
-            '/' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Slash)},
-            '/' => { self.bump(); Token::BinOp(BinOpToken::Slash)},
-            '%' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Percent)},
-            '%' => { self.bump(); Token::BinOp(BinOpToken::Percent)},
-            '^' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Caret)},
-            '^' => { self.bump(); Token::BinOp(BinOpToken::Caret)},
-            '&' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::And)},
+            '+' if p == '=' => { self.dbump(); Token::PlusEq },
+            '+' => { self.bump(); Token::Plus },
+            '-' if p == '=' => { self.dbump(); Token::MinusEq },
+            '-' => { self.bump(); Token::Minus },
+            '*' if p == '=' => { self.dbump(); Token::StarEq },
+            '*' => { self.bump(); Token::Star },
+            '/' if p == '=' => { self.dbump(); Token::SlashEq },
+            '/' => { self.bump(); Token::Slash },
+            '%' if p == '=' => { self.dbump(); Token::PercentEq },
+            '%' => { self.bump(); Token::Percent },
+            '^' if p == '=' => { self.dbump(); Token::CaretEq },
+            '^' => { self.bump(); Token::Caret },
+            '&' if p == '=' => { self.dbump(); Token::AndEq },
             '&' if p == '&' => { self.dbump(); Token::AndAnd },
-            '&' => { self.bump(); Token::BinOp(BinOpToken::And)},
-            '|' if p == '=' => { self.dbump(); Token::BinOpEq(BinOpToken::Or)},
+            '&' => { self.bump(); Token::And },
+            '|' if p == '=' => { self.dbump(); Token::OrEq },
             '|' if p == '|' => { self.dbump(); Token::OrOr },
-            '|' => { self.bump(); Token::BinOp(BinOpToken::Or)},
+            '|' => { self.bump(); Token::Or },
             '~' => { self.bump(); Token::Tilde }
 
             '"' => Token::Literal(Lit::Str(self.scan_string_literal())),
@@ -339,11 +339,11 @@ impl<'a> Iterator for Tokenizer<'a> {
                     None => Token::Word(w),
                 }
             },
-            _ => Token::Other(self.scan_string()),
+            _ => {
+                self.fatal_span("Could not lex string");
+                Token::Whitespace   // Dummy token
+            },
         };
-
-        // println!("{:?}", self.line_breaks);
-        // panic!("yolo");
 
         if self.fatal {
             return None;
