@@ -180,9 +180,20 @@ impl<'a> Parser<'a> {
     }
 
     fn err_unexpected(&self, expected: &[Token], found: Token) -> PErr {
+        let list = expected.iter().enumerate()
+            .fold(String::new(), |mut list, (idx, ref t)| {
+            list.push_str(t.as_java_string());
+            if idx < expected.len() - 2 {
+                list.push_str(", ");
+            } else if idx == expected.len() - 2 {
+                list.push_str(" or ");
+            }
+            list
+        });
+
         self.e.span_err(self.curr.clone().unwrap().span,
-            format!("Unexpected token: Expected one of {:?}, Found {:?}",
-                expected, found).as_ref());
+            format!("Unexpected token: Expected {}, found {}",
+                list, found.as_java_string()).as_ref());
         PErr::Fatal
     }
 }

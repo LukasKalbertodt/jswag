@@ -1,7 +1,7 @@
 /******************************  Quersumme.java  *************************/
 
 import AlgoTools.IO;
-import AlgoTools.*;
+import AlgoTools*;
 import Lololo.xbla.+;
 
 /**

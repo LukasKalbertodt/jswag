@@ -117,4 +117,28 @@ impl Token {
             _ => true,
         }
     }
+
+    pub fn as_java_string(&self) -> &str {
+        match *self {
+            Token::Whitespace => "'whitespace'",
+            Token::Comment => "'comment'",
+
+            Token::Dot => "'.'",
+            Token::Comma => "','",
+            Token::Semi => "';'",
+
+            Token::Eq => "'='",
+            Token::Lt => "'<'",
+            Token::Le => "'<='",
+            Token::EqEq => "'=='",
+            Token::Ne => "'!='",
+            Token::Ge => "'>='",
+            Token::Gt => "'>'",
+            Token::AndAnd => "'&&'",
+            Token::OrOr => "'||'",
+            Token::Not => "'!'",
+            Token::Tilde => "'~'",
+            _ => "'???'",
+        }
+    }
 }
