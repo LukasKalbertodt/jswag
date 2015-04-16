@@ -57,6 +57,15 @@ impl<'a> Tokenizer<'a> {
         tok
     }
 
+    pub fn next_real(&mut self) -> Option<TokenSpan> {
+        loop {
+            match self.next() {
+                Some(ref t) if !t.tok.is_real() => {},
+                t @ _ => return t,
+            }
+        }
+    }
+
     /// Reads a new char from the iterator, updating last, curr and peek + pos
     fn bump(&mut self) {
         self.last = self.curr;

@@ -6,6 +6,7 @@ use std::error::Error;
 use filemap::open_file;
 use diagnostics::ErrorHandler;
 use term_painter::{Color, ToStyle};
+use syntax::parser::Parser;
 
 mod syntax;
 mod diagnostics;
@@ -20,26 +21,31 @@ fn main() {
 
     let error_handler = ErrorHandler::new(filemap.clone());
 
-    let toks = syntax::Tokenizer::new(&filemap, &error_handler);
-    let reals = toks.filter(|t| t.tok.is_real());
+    let toks = Box::new(syntax::Tokenizer::new(&filemap, &error_handler));
+    let mut parser = Parser::new(toks);
+    let cu = parser.parse_cunit();
+    println!("{:?}", cu);
 
-    // let mut t = term::stdout().unwrap();
 
-    // let mut old_line = 0;
-    for tok in reals {
-        // printing line prefix
-        // let new_line = filemap.get_loc(tok.span.lo).line;
-        // if new_line > old_line {
-        //     for i in old_line .. new_line {
-        //         println!("");
-        //         colored!(t, BLUE, (print!("{:>2}: ", i + 1)));
-        //     }
-        //     old_line = new_line;
-        // }
+    // let reals = toks.filter(|t| t.tok.is_real());
 
-        print!("{:?}{}", tok.tok, Color::Blue.paint("|"));
-        // colored!(t, BLUE, print!("|"));
+    // // let mut t = term::stdout().unwrap();
 
-    }
-    println!("");
+    // // let mut old_line = 0;
+    // for tok in reals {
+    //     // printing line prefix
+    //     // let new_line = filemap.get_loc(tok.span.lo).line;
+    //     // if new_line > old_line {
+    //     //     for i in old_line .. new_line {
+    //     //         println!("");
+    //     //         colored!(t, BLUE, (print!("{:>2}: ", i + 1)));
+    //     //     }
+    //     //     old_line = new_line;
+    //     // }
+
+    //     print!("{:?}{}", tok.tok, Color::Blue.paint("|"));
+    //     // colored!(t, BLUE, print!("|"));
+
+    // }
+    // println!("");
 }
