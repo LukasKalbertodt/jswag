@@ -8,14 +8,21 @@ pub struct CUnit {
 }
 
 // A import declaration
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum Import {
     // import IO.AlgoTools;
-    SingleType,
+    Single(Name),
     // called "type-import-on-demand" in specs
     // import IO.*;
-    Wildcard,
+    Wildcard(Name),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct Class;
+
+#[derive(Debug, Clone)]
+pub struct Name {
+    // for qualified names
+    pub path: Vec<String>,
+    pub last: Option<String>,
+}

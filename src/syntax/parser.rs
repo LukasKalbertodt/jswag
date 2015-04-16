@@ -1,5 +1,5 @@
 use std::iter::{Iterator};
-use super::token::{Token, Keyword};
+use super::token::*;
 use super::lexer::{Tokenizer, TokenSpan};
 use std::boxed::Box;
 use super::ast;
@@ -13,6 +13,19 @@ enum PErr {
 }
 
 pub type PResult<T> = Result<T, PErr>;
+
+// macro_rules! expect {
+//     (
+//         $self_:expr;
+//         $( $pattern:expr => $arm:expr),*
+//     ) => (
+//         match $self_.curr() {
+//             $( $pattern => $arm , )*
+//             a @ _ => $self_.err_unexpected( $( $pattern ,)*, a),
+//         }
+
+//     )
+// }
 
 
 pub struct Parser<'a>{
@@ -43,61 +56,102 @@ impl<'a> Parser<'a> {
             imports: Vec::new(),
             class: ast::Class,
         };
-        let exp = [
-            Token::Keyword(Keyword::Import),
-            Token::Keyword(Keyword::Class)];
-        match try!(self.expect(&exp)).tok {
-            Token::Keyword(Keyword::Import) => {
-                cu.imports.push(try!(self.parse_import()));
-            },
-            Token::Keyword(Keyword::Class) => {
-                // self.parse_class()
-            },
-            _ => unreachable!(),
-        }
+        loop {
+            if self.curr.is_none() {
+                break;
+            }
 
+            let curr = try!(self.curr());
+            match curr.tok {
+                Token::Keyword(Keyword::Import) => {
+                    self.bump();
+                    cu.imports.push(try!(self.parse_import()));
+                },
+                _ => break,
+            }
+        }
 
         Ok(cu)
     }
 
     fn parse_import(&mut self) -> PResult<ast::Import> {
-        // token Import is already eaten
+        // Token `Import` is already eaten.
+        let mut name = ast::Name { path: Vec::new(), last: None };
+        let mut w = try!(self.eat_word());
         loop {
-            try!(self.expect_word());
-            match try!(self.expect(&[Token::Dot, Token::Semi])).tok {
-                Token::Semi => break,
-                _ => {},
-            }
-        }
-        Ok(ast::Import::SingleType)
-    }
-
-    fn expect_word(&mut self) -> PResult<&TokenSpan> {
-        match self.curr {
-            None => Err(self.err_eof()),
-            Some(ref curr) => {
-                match curr.tok {
-                    Token::Word(..) => Ok(curr),
-                    _ => Err(self.err_wrong(&[], curr.clone().tok)),
-                }
-            }
-        }
-    }
-
-    fn expect(&mut self, eat: &[Token]/*, spare: &[Token]*/)
-        -> PResult<TokenSpan> {
-        match self.curr.clone() {
-            None => {
-                Err(self.err_eof())
-            },
-            Some(curr) => {
-                if eat.contains(&curr.tok) {
+            match try!(self.curr()).tok {
+                Token::Semi => {
+                    name.last = Some(w);
                     self.bump();
-                    Ok(curr)
-                } else {
-                    Err(self.err_wrong(eat, curr.tok))
-                }
+                    return Ok(ast::Import::Single(name));
+                },
+                Token::Dot => {
+                    name.path.push(w);
+                    self.bump();
+                },
+                f @ _ => return Err(self.err_unexpected(
+                    &[Token::Semi, Token::Dot],f)),
             }
+
+            match try!(self.curr()).tok {
+                Token::BinOp(BinOpToken::Star) => {
+                    self.bump();
+                    try!(self.eat(Token::Semi));
+                    return Ok(ast::Import::Wildcard(name));
+                },
+                Token::Word(s) => {
+                    self.bump();
+                    w = s;
+                },
+                f @ _ => return Err(self.err_unexpected(
+                    &[Token::BinOp(BinOpToken::Star),
+                        Token::Word("".to_string())],
+                    f)),
+            }
+        }
+    }
+
+    fn eat_word(&mut self) -> PResult<String> {
+        let curr = try!(self.curr());
+
+        match curr.tok {
+            Token::Word(s) => {
+                self.bump();
+                Ok(s)
+            },
+            _ => Err(self.err_unexpected(
+                &[Token::Word("".to_string())], curr.clone().tok)),
+        }
+    }
+
+    fn eat(&mut self, t: Token) -> PResult<()> {
+        let curr = try!(self.curr());
+        if curr.tok == t {
+            self.bump();
+            Ok(())
+        } else {
+            Err(self.err_unexpected(&[t], curr.tok))
+        }
+    }
+
+    fn eat_maybe(&mut self, t: Token) -> PResult<bool> {
+        let curr = try!(self.curr());
+        if curr.tok == t {
+            self.bump();
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn expect_one_of(&mut self, eat: &[Token]/*, spare: &[Token]*/)
+        -> PResult<TokenSpan> {
+        let curr = try!(self.curr());
+        if eat.contains(&curr.tok) {
+            self.bump();
+            Ok(curr)
+        } else {
+            Err(self.err_unexpected(eat, curr.tok))
         }
     }
 
@@ -112,15 +166,23 @@ impl<'a> Parser<'a> {
         self.bump();
     }
 
+    fn curr(&mut self) -> PResult<TokenSpan> {
+        match self.curr {
+            None => Err(self.err_eof()),
+            Some(ref curr) => Ok(curr.clone()),
+        }
+    }
+
     // Error reporting stuff
     fn err_eof(&self) -> PErr {
         self.e.err("Expected token, found '<eof'>!");
         PErr::Fatal
     }
 
-    fn err_wrong(&self, expected: &[Token], found: Token) -> PErr {
+    fn err_unexpected(&self, expected: &[Token], found: Token) -> PErr {
         self.e.span_err(self.curr.clone().unwrap().span,
-            format!("Unexpected token: Found {:?}", found).as_ref());
+            format!("Unexpected token: Expected one of {:?}, Found {:?}",
+                expected, found).as_ref());
         PErr::Fatal
     }
 }

@@ -1,6 +1,8 @@
 /******************************  Quersumme.java  *************************/
 
 import AlgoTools.IO;
+import AlgoTools.*;
+import Lololo.xbla.+;
 
 /**
  * Liest eine Zahl >= 0 ein und gibt die Quersumme der Zahl aus.
