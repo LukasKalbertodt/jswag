@@ -141,21 +141,6 @@ impl<'a> Tokenizer<'a> {
         s
     }
 
-    fn scan_string(&mut self) -> String {
-        let mut s = String::new();
-        // Break if its whitespace or None (whitespace in that case)
-        loop {
-            match self.curr.unwrap_or(' ') {
-                c if is_whitespace(c) => break,
-                c => {
-                    s.push(c);
-                },
-            }
-            self.bump();
-        }
-        s
-    }
-
     fn scan_string_literal(&mut self) -> String {
         // TODO: Escape shit
         // `curr` is '"'. Note: After one bump, `last` != None

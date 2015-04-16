@@ -4,7 +4,7 @@ use std::vec::Vec;
 #[derive(Debug, Clone)]
 pub struct CUnit {
     pub imports: Vec<Import>,
-    pub class: Class,
+    pub class: Option<TopLevelClass>,
 }
 
 // A import declaration
@@ -18,7 +18,19 @@ pub enum Import {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Class;
+pub enum Visibility {
+    Public,
+    Protected,
+    Package,
+    Private,
+}
+
+#[derive(Debug, Clone)]
+pub struct TopLevelClass {
+    // Note: Just Public and Package is valid for TopLevelClasses
+    pub visibility: Visibility,
+    pub name: String,
+}
 
 #[derive(Debug, Clone)]
 pub struct Name {

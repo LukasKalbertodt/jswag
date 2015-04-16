@@ -14,19 +14,6 @@ enum PErr {
 
 pub type PResult<T> = Result<T, PErr>;
 
-// macro_rules! expect {
-//     (
-//         $self_:expr;
-//         $( $pattern:expr => $arm:expr),*
-//     ) => (
-//         match $self_.curr() {
-//             $( $pattern => $arm , )*
-//             a @ _ => $self_.err_unexpected( $( $pattern ,)*, a),
-//         }
-
-//     )
-// }
-
 
 pub struct Parser<'a>{
     // Token stream
@@ -50,11 +37,13 @@ impl<'a> Parser<'a> {
         p
     }
 
-    // Parse a complete compilation unit
+    // Parse a complete compilation unit. A CU consists of:
+    // [PackageDecls] [ImportDecls] [TypeDecls]
+    // A TypeDecl is either a ClassDecl or InterfaceDecl
     pub fn parse_cunit(&mut self) -> PResult<ast::CUnit> {
         let mut cu = ast::CUnit {
             imports: Vec::new(),
-            class: ast::Class,
+            class: None,
         };
         loop {
             if self.curr.is_none() {
@@ -67,6 +56,10 @@ impl<'a> Parser<'a> {
                     self.bump();
                     cu.imports.push(try!(self.parse_import()));
                 },
+                Token::Keyword(Keyword::Public)
+                    | Token::Keyword(Keyword::Class) => {
+                    cu.class = Some(try!(self.parse_top_lvl_class()));
+                }
                 _ => break,
             }
         }
@@ -74,17 +67,61 @@ impl<'a> Parser<'a> {
         Ok(cu)
     }
 
+    fn parse_top_lvl_class(&mut self) -> PResult<ast::TopLevelClass> {
+        let mut c = ast::TopLevelClass {
+            visibility: ast::Visibility::Package,
+            name: "".to_string(),
+        };
+
+        // Parse class modifier, until `class` appears
+        // TODO: More class modifier (static, ..)
+        loop {
+            let curr = try!(self.curr());
+            match curr.tok {
+                Token::Keyword(Keyword::Public) => {
+                    c.visibility = ast::Visibility::Public;
+                    self.bump();
+                },
+                Token::Keyword(Keyword::Class) => {
+                    self.bump();
+                    break;
+                },
+                o @ _ => {
+                    let ex = &[Token::Keyword(Keyword::Public),
+                        Token::Keyword(Keyword::Class)];
+                    return Err(self.err_unexpected(ex, o));
+                }
+            }
+        }
+
+        // `class` was parsed, next token should be class name
+        c.name = try!(self.eat_word());
+
+        // TODO: Type Params
+        // TODO: Super class
+        // TODO: implements
+
+        // try!(self.eat(Token::OpenDelim(DelimToken::Brace)));
+
+        Ok(c)
+    }
+
     fn parse_import(&mut self) -> PResult<ast::Import> {
-        // Token `Import` is already eaten.
+        // `import` has already been eaten.
         let mut name = ast::Name { path: Vec::new(), last: None };
+
+        // The first token after `import` needs to be a word.
         let mut w = try!(self.eat_word());
+
         loop {
             match try!(self.curr()).tok {
+                // End of `import` -> Eat Semi and return name.
                 Token::Semi => {
                     name.last = Some(w);
                     self.bump();
                     return Ok(ast::Import::Single(name));
                 },
+                // Name continues
                 Token::Dot => {
                     name.path.push(w);
                     self.bump();
@@ -94,6 +131,7 @@ impl<'a> Parser<'a> {
             }
 
             match try!(self.curr()).tok {
+                // Wildcard symbol -> Semi expected and return name.
                 Token::Star => {
                     self.bump();
                     try!(self.eat(Token::Semi));
@@ -132,26 +170,26 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn eat_maybe(&mut self, t: Token) -> PResult<bool> {
-        let curr = try!(self.curr());
-        if curr.tok == t {
-            self.bump();
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
+    // fn eat_maybe(&mut self, t: Token) -> PResult<bool> {
+    //     let curr = try!(self.curr());
+    //     if curr.tok == t {
+    //         self.bump();
+    //         Ok(true)
+    //     } else {
+    //         Ok(false)
+    //     }
+    // }
 
-    fn expect_one_of(&mut self, eat: &[Token]/*, spare: &[Token]*/)
-        -> PResult<TokenSpan> {
-        let curr = try!(self.curr());
-        if eat.contains(&curr.tok) {
-            self.bump();
-            Ok(curr)
-        } else {
-            Err(self.err_unexpected(eat, curr.tok))
-        }
-    }
+    // fn expect_one_of(&mut self, eat: &[Token]/*, spare: &[Token]*/)
+    //     -> PResult<TokenSpan> {
+    //     let curr = try!(self.curr());
+    //     if eat.contains(&curr.tok) {
+    //         self.bump();
+    //         Ok(curr)
+    //     } else {
+    //         Err(self.err_unexpected(eat, curr.tok))
+    //     }
+    // }
 
     // Advances by one token
     fn bump(&mut self) {
