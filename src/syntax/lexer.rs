@@ -104,7 +104,7 @@ impl<'a> Tokenizer<'a> {
     // }
 
     fn fatal_span(&mut self, m: &str) {
-        self.diag.error_span(Span { lo: self.token_start, hi: self.curr_pos}, m);
+        self.diag.span_err(Span { lo: self.token_start, hi: self.curr_pos}, m);
         self.fatal = true;
     }
 

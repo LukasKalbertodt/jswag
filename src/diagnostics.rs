@@ -19,7 +19,7 @@ impl ErrorHandler {
         ErrorHandler { fmap: fmap }
     }
 
-    pub fn error(&self, m: &str) {
+    pub fn err(&self, m: &str) {
         println!("");
         print!("{}: {} {}",
             self.fmap.filename, Red.paint("error:"), Bold.paint(m));
@@ -38,7 +38,7 @@ impl ErrorHandler {
             print!("{0:>1$}", " ", pre.len() + start.col);
 
             Yellow.with(|| {
-                println!("{:-<1$}", "^", end.col-start.col+2);
+                println!("{:-<1$}", "^", end.col-start.col+1);
             });
 
         } else {
@@ -51,7 +51,7 @@ impl ErrorHandler {
         }
     }
 
-    pub fn error_span(&self, span: Span, m: &str) {
+    pub fn span_err(&self, span: Span, m: &str) {
         let start = self.fmap.get_loc(span.lo);
         let end = self.fmap.get_loc(span.hi - 1);
 

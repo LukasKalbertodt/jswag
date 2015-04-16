@@ -1,5 +1,5 @@
+#![allow(unused_imports)]
 extern crate term_painter;
-
 
 use std::path::Path;
 use std::error::Error;
@@ -22,9 +22,9 @@ fn main() {
     let error_handler = ErrorHandler::new(filemap.clone());
 
     let toks = Box::new(syntax::Tokenizer::new(&filemap, &error_handler));
-    let mut parser = Parser::new(toks);
+    let mut parser = Parser::new(toks, &error_handler);
     let cu = parser.parse_cunit();
-    println!("{:?}", cu);
+    println!("{:?}", cu.ok());
 
 
     // let reals = toks.filter(|t| t.tok.is_real());
