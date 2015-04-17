@@ -76,5 +76,7 @@ java_enum! (Modifier {
 pub struct Method {
     pub vis: Visibility,
     pub name: String,
-    pub return_ty: String,
+    pub ret_ty: String,
+    pub static_: bool,
+    pub final_: bool,
 }

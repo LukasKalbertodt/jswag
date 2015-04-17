@@ -152,7 +152,7 @@ impl<'a> Parser<'a> {
                 // TODO: Check and accept other modifiers
                 o @ _ => {
                     self.e.span_err(s, format!("Unexpected class modifier `{}`",
-                        o.as_java_string()).as_ref());
+                        o.as_java_string()));
                     return Err(PErr::Fatal);
                 },
             }
@@ -180,7 +180,7 @@ impl<'a> Parser<'a> {
             }
 
             // Try to parse a member. It starts with modifiers.
-            let mmods = self.parse_modifiers();
+            let mmods = try!(self.parse_modifiers());
 
             // Next up will be a type
             let ty = try!(self.eat_word());
@@ -194,23 +194,100 @@ impl<'a> Parser<'a> {
 
             match try!(self.curr()).tok {
                 Token::OpenDelim(DelimToken::Paren) => {
-                    try!(self.skip_block(DelimToken::Paren));
-                    try!(self.skip_block(DelimToken::Brace));
-                    c.methods.push(ast::Method {
-                        vis: ast::Visibility::Public,
-                        name: name,
-                        return_ty: ty,
-                    });
+                    c.methods.push(try!(self.parse_method(name, ty, mmods)));
                 },
+                Token::Semi | Token::Eq | Token::Comma => {
+                    while try!(self.curr()).tok != Token::Semi {
+                        self.bump();
+                    }
+                    self.bump();
+                }
                 o @ _ => {
                     return Err(self.err_unexpected(
-                        &[Token::OpenDelim(DelimToken::Paren)], o));
+                        &[Token::OpenDelim(DelimToken::Paren), Token::Semi,
+                        Token::Eq, Token::Comma], o));
                 }
             }
 
         }
 
         Ok(c)
+    }
+
+    fn parse_method(&mut self, name: String, ret_ty: String,
+        mods: ModifiersAtSpans) -> PResult<ast::Method> {
+        let mut meth = ast::Method {
+            vis: ast::Visibility::Package,
+            name: name,
+            ret_ty: ret_ty,
+            static_: false,
+            final_: false,
+        };
+
+        // Parse and verify method modifiers ordered by span
+        let mut mods_in_order : Vec<_> = mods.into_iter().collect();
+        mods_in_order.sort_by(|a, b| a.1.lo.cmp(&b.1.lo));
+
+        let mut parsed_vis : Option<(Span, ast::Modifier)> = None;
+        for (m, s) in mods_in_order {
+            match m {
+                ast::Modifier::Public | ast::Modifier::Protected
+                    | ast::Modifier::Private => {
+                    match parsed_vis {
+                        Some((span, vi)) => {
+                            self.e.span_err(s, format!(
+                                "Unexpected visibility modifier `{}`",
+                                m.as_java_string()));
+                            self.e.span_note(span, format!(
+                                "Already parsed the visibility modifier `{}` here",
+                                vi.as_java_string()));
+                            return Err(PErr::Fatal);
+                        },
+                        None => {
+                            meth.vis = match m {
+                                ast::Modifier::Public => ast::Visibility::Public,
+                                ast::Modifier::Protected => ast::Visibility::Protected,
+                                ast::Modifier::Private => ast::Visibility::Public,
+                                _ => unreachable!(),
+                            };
+                            parsed_vis = Some((s, m));
+                        }
+                    }
+                },
+                ast::Modifier::Static => {
+                    meth.static_ = true;
+                },
+                ast::Modifier::Final => {
+                    meth.final_ = true;
+                },
+                // TODO: Check other modifiers (abstract, synchronized, native, strictfp)
+                o @ _ => {
+                    self.e.span_err(s, format!("Unexpected method modifier `{}`",
+                        o.as_java_string()));
+                    return Err(PErr::Fatal);
+                },
+            }
+        }
+
+        // parse parameter list
+        // TODO: ReceiverParamter + LastFormalParameter
+        try!(self.eat(Token::OpenDelim(DelimToken::Paren)));
+
+        while !try!(self.eat_maybe(Token::OpenDelim(DelimToken::Paren))) {
+            println!("MARK");
+            self.eat_maybe(Token::Keyword(Keyword::Final));
+            try!(self.eat_word());  // type
+            try!(self.eat_word());  // name
+            try!(self.eat_maybe(Token::Comma));
+        }
+
+
+        // try!(self.skip_block(DelimToken::Paren));
+
+        // skip body
+        try!(self.skip_block(DelimToken::Brace));
+
+        Ok(meth)
     }
 
     fn parse_import(&mut self) -> PResult<ast::Import> {
@@ -324,7 +401,7 @@ impl<'a> Parser<'a> {
 
     fn err_dupe(&self, t: Token, dupe_span: Span) -> PErr {
         self.e.span_err(dupe_span,
-            format!("Duplicate token `{}`", t.as_java_string()).as_ref());
+            format!("Duplicate token `{}`", t.as_java_string()));
         PErr::Fatal
     }
 
@@ -342,7 +419,7 @@ impl<'a> Parser<'a> {
 
         self.e.span_err(self.curr.clone().unwrap().span,
             format!("Unexpected token: Expected {}, found `{}`",
-                list, found.as_java_string()).as_ref());
+                list, found.as_java_string()));
         PErr::Fatal
     }
 }

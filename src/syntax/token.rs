@@ -193,7 +193,13 @@ impl Token {
 
             Token::Keyword(keyword) => keyword.as_java_string(),
             // Token::Word(ref w) => format!("Word('{}')", w).as_str() ,
-            Token::Word(ref w) => w.as_ref(),
+            Token::Word(ref w) => {
+                if w.is_empty() {
+                    "Ident"
+                } else {
+                    w.as_ref()
+                }
+            },
 
             Token::Literal(..) => "Lit(???)",
 

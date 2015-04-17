@@ -1,7 +1,7 @@
 use filemap::{FileMap, Span, Loc};
 use std::rc::Rc;
 // use std::iter::repeat;
-use term_painter::ToStyle;
+use term_painter::{ToStyle, Color};
 use term_painter::Color::*;
 use term_painter::Attr::*;
 
@@ -25,7 +25,7 @@ impl ErrorHandler {
             self.fmap.filename, Red.paint("error:"), Bold.paint(m));
     }
 
-    fn print_snippet(&self, start: Loc, end: Loc) {
+    fn print_snippet(&self, start: Loc, end: Loc, ucol: Color) {
         if start.line == end.line {
             let pre = format!("{}:{}: ", self.fmap.filename, start.line);
 
@@ -37,7 +37,7 @@ impl ErrorHandler {
             // Print spaces until the span start is reached
             print!("{0:>1$}", " ", pre.len() + start.col);
 
-            Yellow.with(|| {
+            ucol.with(|| {
                 println!("{:-<1$}", "^", end.col-start.col+1);
             });
 
@@ -51,7 +51,7 @@ impl ErrorHandler {
         }
     }
 
-    pub fn span_err(&self, span: Span, m: &str) {
+    pub fn span_err(&self, span: Span, m: String) {
         let start = self.fmap.get_loc(span.lo);
         let end = self.fmap.get_loc(span.hi - 1);
 
@@ -62,7 +62,21 @@ impl ErrorHandler {
             el=Blue.paint(end.line), ec=end.col,
             error=Red.paint("error:"), m=Bold.paint(m));
 
-        self.print_snippet(start, end);
+        self.print_snippet(start, end, Red);
 
+    }
+
+    pub fn span_note(&self, span: Span, m: String) {
+        let start = self.fmap.get_loc(span.lo);
+        let end = self.fmap.get_loc(span.hi - 1);
+
+        println!("");
+        println!("{file}:{sl}:{sc} .. {el}:{ec}: {error} {m}",
+            file=self.fmap.filename,
+            sl=Blue.paint(start.line), sc=start.col,
+            el=Blue.paint(end.line), ec=end.col,
+            error=Green.paint("note:"), m=Bold.paint(m));
+
+        self.print_snippet(start, end, Green);
     }
 }

@@ -8,6 +8,8 @@ import AlgoTools.*;
  */
 
 public class Quersumme {
+  public static float pi = 3.1415926;
+
   public static void main(String[] args) {
     int zahl;
 
