@@ -30,4 +30,3 @@ public class Quersumme {
     IO.println("Die Quersumme ist: " + quersumme);
   }
 }
-import "blaaa

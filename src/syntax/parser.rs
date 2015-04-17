@@ -56,6 +56,8 @@ impl<'a> Parser<'a> {
                     self.bump();
                     cu.imports.push(try!(self.parse_import()));
                 },
+                // TODO: Detecting beginning of class is more complex. It could
+                // start with variouWass keywords and could be an interface.
                 Token::Keyword(Keyword::Public)
                     | Token::Keyword(Keyword::Class) => {
                     cu.class = Some(try!(self.parse_top_lvl_class()));
@@ -65,6 +67,29 @@ impl<'a> Parser<'a> {
         }
 
         Ok(cu)
+    }
+
+    fn skip_brace_block(&mut self) -> PResult<()> {
+        // Just call the function if the next token is a '{'
+        try!(self.eat(Token::OpenDelim(DelimToken::Brace)));
+        let mut depth = 1;
+
+        while depth > 0 {
+            match self.curr {
+                None => {
+                    return Err(PErr::Fatal);
+                },
+                Some(ref curr) => {
+                    match curr.tok {
+                        Token::OpenDelim(DelimToken::Brace) => { depth += 1; },
+                        Token::CloseDelim(DelimToken::Brace) => { depth -= 1; },
+                        _ => {}
+                    }
+                },
+            }
+            self.bump()
+        };
+        Ok(())
     }
 
     fn parse_top_lvl_class(&mut self) -> PResult<ast::TopLevelClass> {
@@ -102,6 +127,7 @@ impl<'a> Parser<'a> {
         // TODO: implements
 
         // try!(self.eat(Token::OpenDelim(DelimToken::Brace)));
+        self.skip_brace_block();
 
         Ok(c)
     }
