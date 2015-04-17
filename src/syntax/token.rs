@@ -30,11 +30,20 @@ macro_rules! declare_keywords {(
 }}
 
 declare_keywords! {
+    // modifier
     (Public,        "public");
-    (Private,       "private");
     (Protected,     "protected");
+    (Private,       "private");
+    (Abstract , "abstract");
+    (Static , "static");
+    (Final , "final");
+    (Synchronized , "synchronized");
+    (Native , "native");
+    (Strictfp , "strictfp");
+    (Transient , "transient");
+    (Volatile , "volatile");
+
     (Class,         "class");
-    (Static,        "static");
     (Import,        "import");
 
     // control structures
@@ -44,6 +53,7 @@ declare_keywords! {
     (If,     "if");
     (Else,   "else");
 }
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinOpToken {
@@ -59,7 +69,7 @@ pub enum BinOpToken {
     Shr,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DelimToken {
     Paren,      // round ( )
     Bracket,    // square [ ]

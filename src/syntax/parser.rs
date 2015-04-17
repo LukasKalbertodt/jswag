@@ -7,12 +7,15 @@ use filemap::Span;
 use std::result::Result;
 use diagnostics::ErrorHandler;
 use std::mem::swap;
+use std::collections::HashMap;
 
 enum PErr {
     Fatal,
 }
 
 pub type PResult<T> = Result<T, PErr>;
+
+pub type ModifiersAtSpans = HashMap<ast::Modifier, Span>;
 
 
 pub struct Parser<'a>{
@@ -69,9 +72,9 @@ impl<'a> Parser<'a> {
         Ok(cu)
     }
 
-    fn skip_brace_block(&mut self) -> PResult<()> {
+    fn skip_block(&mut self, d: DelimToken) -> PResult<()> {
         // Just call the function if the next token is a '{'
-        try!(self.eat(Token::OpenDelim(DelimToken::Brace)));
+        try!(self.eat(Token::OpenDelim(d)));
         let mut depth = 1;
 
         while depth > 0 {
@@ -81,8 +84,12 @@ impl<'a> Parser<'a> {
                 },
                 Some(ref curr) => {
                     match curr.tok {
-                        Token::OpenDelim(DelimToken::Brace) => { depth += 1; },
-                        Token::CloseDelim(DelimToken::Brace) => { depth -= 1; },
+                        Token::OpenDelim(delim) if delim == d => {
+                            depth += 1;
+                        },
+                        Token::CloseDelim(delim) if delim == d => {
+                            depth -= 1;
+                        },
                         _ => {}
                     }
                 },
@@ -92,32 +99,67 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    fn parse_modifiers(&mut self) -> PResult<ModifiersAtSpans> {
+        let mut mods = ModifiersAtSpans::new();
+
+        loop {
+            // Read each token and check if its a modifier token. If it is,
+            // add the modifier associated with its span to the map. If the
+            // map already contains that modifier, raise an error, since every
+            // modifier is allowed only once.
+            // Stop searching when the first non-modifier token appears.
+            macro_rules! check_keywords {
+                ($($k:ident,)*) => {{
+                    // Modifiers are in front of other stuff, so there should
+                    // be a next token (program is illformed otherwise).
+                    let curr = try!(self.curr());
+                    match curr.tok {
+                        $( k @ Token::Keyword(Keyword::$k) => {
+                            if mods.insert(ast::Modifier::$k, curr.span)
+                                .is_some() {
+                                return Err(self.err_dupe(k, curr.span));
+                            }
+                        }, )*
+                        _ => break,
+                    };
+                }}
+            }
+
+            check_keywords!(Public, Private, Protected, Abstract, Static,
+                Final, Synchronized, Native, Strictfp, Transient, Volatile,);
+
+            // consume token
+            self.bump();
+        }
+
+        Ok(mods)
+    }
+
     fn parse_top_lvl_class(&mut self) -> PResult<ast::TopLevelClass> {
         let mut c = ast::TopLevelClass {
-            visibility: ast::Visibility::Package,
+            vis: ast::Visibility::Package,
             name: "".to_string(),
+            methods: Vec::new(),
         };
 
-        // Parse class modifier, until `class` appears
-        // TODO: More class modifier (static, ..)
-        loop {
-            let curr = try!(self.curr());
-            match curr.tok {
-                Token::Keyword(Keyword::Public) => {
-                    c.visibility = ast::Visibility::Public;
-                    self.bump();
+        // Parse and verify class modifiers
+        let mods = try!(self.parse_modifiers());
+        for (m, s) in mods {
+            match m {
+                ast::Modifier::Public => {
+                    c.vis = ast::Visibility::Public;
                 },
-                Token::Keyword(Keyword::Class) => {
-                    self.bump();
-                    break;
-                },
+                // TODO: Check and accept other modifiers
                 o @ _ => {
-                    let ex = &[Token::Keyword(Keyword::Public),
-                        Token::Keyword(Keyword::Class)];
-                    return Err(self.err_unexpected(ex, o));
-                }
+                    self.e.span_err(s, format!("Unexpected class modifier `{}`",
+                        o.as_java_string()).as_ref());
+                    return Err(PErr::Fatal);
+                },
             }
         }
+
+        // `class` is expected now.
+        try!(self.eat(Token::Keyword(Keyword::Class)));
 
         // `class` was parsed, next token should be class name
         c.name = try!(self.eat_word());
@@ -126,8 +168,47 @@ impl<'a> Parser<'a> {
         // TODO: Super class
         // TODO: implements
 
-        // try!(self.eat(Token::OpenDelim(DelimToken::Brace)));
-        self.skip_brace_block();
+        // try!(self.skip_brace_block());
+
+        // Start of class body
+        try!(self.eat(Token::OpenDelim(DelimToken::Brace)));
+
+        loop {
+            // If a closing brace closes the class -> stop parsing
+            if try!(self.eat_maybe(Token::CloseDelim(DelimToken::Brace))) {
+                break;
+            }
+
+            // Try to parse a member. It starts with modifiers.
+            let mmods = self.parse_modifiers();
+
+            // Next up will be a type
+            let ty = try!(self.eat_word());
+
+            // Next up: Method name or first field name
+            let name = try!(self.eat_word());
+
+            // At this point we can finally decide what we are parsing: If it's
+            // a method, the next token needs to be a `(`. If it's a field it
+            // could either be `;`, `=` or `,`.
+
+            match try!(self.curr()).tok {
+                Token::OpenDelim(DelimToken::Paren) => {
+                    try!(self.skip_block(DelimToken::Paren));
+                    try!(self.skip_block(DelimToken::Brace));
+                    c.methods.push(ast::Method {
+                        vis: ast::Visibility::Public,
+                        name: name,
+                        return_ty: ty,
+                    });
+                },
+                o @ _ => {
+                    return Err(self.err_unexpected(
+                        &[Token::OpenDelim(DelimToken::Paren)], o));
+                }
+            }
+
+        }
 
         Ok(c)
     }
@@ -196,15 +277,15 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // fn eat_maybe(&mut self, t: Token) -> PResult<bool> {
-    //     let curr = try!(self.curr());
-    //     if curr.tok == t {
-    //         self.bump();
-    //         Ok(true)
-    //     } else {
-    //         Ok(false)
-    //     }
-    // }
+    fn eat_maybe(&mut self, t: Token) -> PResult<bool> {
+        let curr = try!(self.curr());
+        if curr.tok == t {
+            self.bump();
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
 
     // fn expect_one_of(&mut self, eat: &[Token]/*, spare: &[Token]*/)
     //     -> PResult<TokenSpan> {
@@ -241,13 +322,19 @@ impl<'a> Parser<'a> {
         PErr::Fatal
     }
 
+    fn err_dupe(&self, t: Token, dupe_span: Span) -> PErr {
+        self.e.span_err(dupe_span,
+            format!("Duplicate token `{}`", t.as_java_string()).as_ref());
+        PErr::Fatal
+    }
+
     fn err_unexpected(&self, expected: &[Token], found: Token) -> PErr {
         let list = expected.iter().enumerate()
             .fold(String::new(), |mut list, (idx, ref t)| {
             list.push_str(&*format!("`{}`", t.as_java_string()));
-            if idx < expected.len() - 2 {
+            if idx + 2< expected.len() {
                 list.push_str(", ");
-            } else if idx == expected.len() - 2 {
+            } else if idx + 2 == expected.len() {
                 list.push_str(" or ");
             }
             list

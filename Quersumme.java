@@ -29,4 +29,6 @@ public class Quersumme {
 
     IO.println("Die Quersumme ist: " + quersumme);
   }
+
+  public int foo() {}
 }
