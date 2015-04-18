@@ -220,6 +220,7 @@ impl<'a> Parser<'a> {
             ret_ty: ret_ty,
             static_: false,
             final_: false,
+            params: Vec::new(),
         };
 
         // Parse and verify method modifiers ordered by span
@@ -267,12 +268,23 @@ impl<'a> Parser<'a> {
         // TODO: ReceiverParamter + LastFormalParameter
         try!(self.eat(Token::OpenDelim(DelimToken::Paren)));
 
-        while !try!(self.eat_maybe(Token::OpenDelim(DelimToken::Paren))) {
-            println!("MARK");
-            self.eat_maybe(Token::Keyword(Keyword::Final));
-            try!(self.eat_word());  // type
-            try!(self.eat_word());  // name
+        while !try!(self.eat_maybe(Token::CloseDelim(DelimToken::Paren))) {
+            let mut param = ast::FormalParameter {
+                ty: "".to_string(),
+                name: "".to_string(),
+                dims: 0,
+                final_: false,
+            };
+            param.final_ = try!(self.eat_maybe(Token::Keyword(Keyword::Final)));
+            param.ty = try!(self.eat_word());  // type
+            param.dims = try!(self.parse_dims());
+            param.name = try!(self.eat_word());  // name
+            if param.dims == 0 {
+                param.dims = try!(self.parse_dims());
+            }
             try!(self.eat_maybe(Token::Comma));
+
+            meth.params.push(param);
         }
 
 
@@ -282,6 +294,19 @@ impl<'a> Parser<'a> {
         try!(self.skip_block(DelimToken::Brace));
 
         Ok(meth)
+    }
+
+    fn parse_dims(&mut self) -> PResult<usize> {
+        let mut count = 0;
+        loop {
+            if try!(self.eat_maybe(Token::OpenDelim(DelimToken::Bracket))) {
+                try!(self.eat(Token::CloseDelim(DelimToken::Bracket)));
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        Ok(count)
     }
 
     fn parse_import(&mut self) -> PResult<ast::Import> {

@@ -86,4 +86,13 @@ pub struct Method {
     pub ret_ty: String,
     pub static_: bool,
     pub final_: bool,
+    pub params: Vec<FormalParameter>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FormalParameter {
+    pub ty: String,
+    pub name: String,
+    pub dims: usize,
+    pub final_: bool,
 }
