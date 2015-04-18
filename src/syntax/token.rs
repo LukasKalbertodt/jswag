@@ -1,5 +1,6 @@
 /// Module `token`:
 /// Contains enums and structs, that describe token types in Java.
+use std::fmt::{Display, Formatter, Error};
 
 // Macro to reduce repeated code for keywords.
 macro_rules! declare_keywords {(
@@ -25,6 +26,12 @@ macro_rules! declare_keywords {(
                 $( $word => Some(Keyword::$name), )*
                 _ => None,
             }
+        }
+    }
+
+    impl Display for Keyword {
+        fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+            write!(f, "{}", self.as_java_string())
         }
     }
 }}
@@ -216,5 +223,11 @@ impl Token {
 
             // _ => "'???'",
         }.to_string()
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}", self.as_java_string())
     }
 }

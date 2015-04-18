@@ -61,8 +61,7 @@ impl<'a> Parser<'a> {
                 },
                 // TODO: Detecting beginning of class is more complex. It could
                 // start with variouWass keywords and could be an interface.
-                Token::Keyword(Keyword::Public)
-                    | Token::Keyword(Keyword::Class) => {
+                Token::Keyword(Keyword::Public) | Token::Keyword(Keyword::Class) => {
                     cu.class = Some(try!(self.parse_top_lvl_class()));
                 }
                 _ => break,
@@ -115,8 +114,7 @@ impl<'a> Parser<'a> {
                     let curr = try!(self.curr());
                     match curr.tok {
                         $( k @ Token::Keyword(Keyword::$k) => {
-                            if mods.insert(ast::Modifier::$k, curr.span)
-                                .is_some() {
+                            if mods.insert(ast::Modifier::$k, curr.span).is_some() {
                                 return Err(self.err_dupe(k, curr.span));
                             }
                         }, )*
@@ -151,8 +149,7 @@ impl<'a> Parser<'a> {
                 },
                 // TODO: Check and accept other modifiers
                 o @ _ => {
-                    self.e.span_err(s, format!("Unexpected class modifier `{}`",
-                        o.as_java_string()));
+                    self.e.span_err(s, format!("Unexpected class modifier `{}`", o));
                     return Err(PErr::Fatal);
                 },
             }
@@ -203,6 +200,7 @@ impl<'a> Parser<'a> {
                     self.bump();
                 }
                 o @ _ => {
+                    let ex =
                     return Err(self.err_unexpected(
                         &[Token::OpenDelim(DelimToken::Paren), Token::Semi,
                         Token::Eq, Token::Comma], o));
@@ -214,8 +212,8 @@ impl<'a> Parser<'a> {
         Ok(c)
     }
 
-    fn parse_method(&mut self, name: String, ret_ty: String,
-        mods: ModifiersAtSpans) -> PResult<ast::Method> {
+    fn parse_method(&mut self, name: String, ret_ty: String, mods: ModifiersAtSpans)
+        -> PResult<ast::Method> {
         let mut meth = ast::Method {
             vis: ast::Visibility::Package,
             name: name,
@@ -235,12 +233,9 @@ impl<'a> Parser<'a> {
                     | ast::Modifier::Private => {
                     match parsed_vis {
                         Some((span, vi)) => {
-                            self.e.span_err(s, format!(
-                                "Unexpected visibility modifier `{}`",
-                                m.as_java_string()));
-                            self.e.span_note(span, format!(
-                                "Already parsed the visibility modifier `{}` here",
-                                vi.as_java_string()));
+                            self.e.span_err(s, format!("Unexpected visibility modifier `{}`", m));
+                            self.e.span_note(span,
+                                format!("Already parsed the visibility modifier `{}` here", vi));
                             return Err(PErr::Fatal);
                         },
                         None => {
@@ -262,8 +257,7 @@ impl<'a> Parser<'a> {
                 },
                 // TODO: Check other modifiers (abstract, synchronized, native, strictfp)
                 o @ _ => {
-                    self.e.span_err(s, format!("Unexpected method modifier `{}`",
-                        o.as_java_string()));
+                    self.e.span_err(s, format!("Unexpected method modifier `{}`", o));
                     return Err(PErr::Fatal);
                 },
             }
@@ -310,8 +304,7 @@ impl<'a> Parser<'a> {
                     name.path.push(w);
                     self.bump();
                 },
-                f @ _ => return Err(self.err_unexpected(
-                    &[Token::Semi, Token::Dot],f)),
+                f @ _ => return Err(self.err_unexpected(&[Token::Semi, Token::Dot], f)),
             }
 
             match try!(self.curr()).tok {
@@ -339,8 +332,7 @@ impl<'a> Parser<'a> {
                 self.bump();
                 Ok(s)
             },
-            _ => Err(self.err_unexpected(
-                &[Token::Word("".to_string())], curr.clone().tok)),
+            _ => Err(self.err_unexpected(&[Token::Word("".to_string())], curr.clone().tok)),
         }
     }
 
@@ -401,15 +393,14 @@ impl<'a> Parser<'a> {
 
     fn err_dupe(&self, t: Token, dupe_span: Span) -> PErr {
         self.e.span_err(dupe_span,
-            format!("Duplicate token `{}`", t.as_java_string()));
+            format!("Duplicate token `{}`", t));
         PErr::Fatal
     }
 
     fn err_unexpected(&self, expected: &[Token], found: Token) -> PErr {
-        let list = expected.iter().enumerate()
-            .fold(String::new(), |mut list, (idx, ref t)| {
-            list.push_str(&*format!("`{}`", t.as_java_string()));
-            if idx + 2< expected.len() {
+        let list = expected.iter().enumerate().fold(String::new(), |mut list, (idx, ref t)| {
+            list.push_str(&*format!("`{}`", t));
+            if idx + 2 < expected.len() {
                 list.push_str(", ");
             } else if idx + 2 == expected.len() {
                 list.push_str(" or ");
@@ -418,8 +409,7 @@ impl<'a> Parser<'a> {
         });
 
         self.e.span_err(self.curr.clone().unwrap().span,
-            format!("Unexpected token: Expected {}, found `{}`",
-                list, found.as_java_string()));
+            format!("Unexpected token: Expected {}, found `{}`", list, found));
         PErr::Fatal
     }
 }

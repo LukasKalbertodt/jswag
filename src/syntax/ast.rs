@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter, Error};
 use std::vec::Vec;
 
 macro_rules! java_enum { (
@@ -13,6 +14,12 @@ macro_rules! java_enum { (
             match *self {
                 $( $name::$variant => $java_word , )*
             }
+        }
+    }
+
+    impl Display for $name {
+        fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+            write!(f, "{}", self.as_java_string())
         }
     }
 }}
