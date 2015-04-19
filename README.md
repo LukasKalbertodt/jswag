@@ -1,7 +1,7 @@
 Java Style Checker
 ==================
 
-Checks if your Java program has #swag, yo! With an own Java parser, damn!
+Checks if your Java program has #swag. With my own Java parser.
 
 ![alt text](https://raw.githubusercontent.com/LukasKalbertodt/jswag/master/media/early_showcase.png "Proof of concept showcase")
 
