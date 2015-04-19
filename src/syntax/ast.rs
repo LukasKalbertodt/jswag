@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter, Error};
+use filemap::Span;
 use std::vec::Vec;
+use std::default::Default;
 
 macro_rules! java_enum { (
     $name:ident { $( $variant:ident => $java_word:expr, )* }
@@ -28,8 +30,30 @@ macro_rules! java_enum { (
 // A Java compilation unit: "File that contains one class"
 #[derive(Debug, Clone)]
 pub struct CUnit {
-    pub imports: Vec<Import>,
-    pub class: Option<TopLevelClass>,
+    pub items: Vec<Item>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Item {
+    Import(Import),
+    Class(Box<Class>),
+    Method(Box<Method>),
+}
+
+
+#[derive(Debug, Clone)]
+pub struct Ident {
+    pub name: String,
+    pub span: Span,
+}
+
+impl Default for Ident {
+    fn default() -> Self {
+        Ident {
+            name: "".to_string(),
+            span: Span { lo: 0, hi: 0 },
+        }
+    }
 }
 
 // A import declaration
@@ -51,18 +75,17 @@ pub enum Visibility {
 }
 
 #[derive(Debug, Clone)]
-pub struct TopLevelClass {
-    // Note: Just Public and Package is valid for TopLevelClasses
+pub struct Class {
+    pub name: Ident,
     pub vis: Visibility,
-    pub name: String,
     pub methods: Vec<Method>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Name {
     // for qualified names
-    pub path: Vec<String>,
-    pub last: Option<String>,
+    pub path: Vec<Ident>,
+    pub last: Option<Ident>,
 }
 
 java_enum! (Modifier {
@@ -82,8 +105,8 @@ java_enum! (Modifier {
 #[derive(Debug, Clone)]
 pub struct Method {
     pub vis: Visibility,
-    pub name: String,
-    pub ret_ty: String,
+    pub name: Ident,
+    pub ret_ty: Ident,
     pub static_: bool,
     pub final_: bool,
     pub params: Vec<FormalParameter>,
@@ -91,8 +114,8 @@ pub struct Method {
 
 #[derive(Debug, Clone)]
 pub struct FormalParameter {
-    pub ty: String,
-    pub name: String,
+    pub ty: Ident,
+    pub name: Ident,
     pub dims: usize,
     pub final_: bool,
 }

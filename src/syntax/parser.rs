@@ -8,6 +8,7 @@ use std::result::Result;
 use diagnostics::ErrorHandler;
 use std::mem::swap;
 use std::collections::HashMap;
+use std::default::Default;
 
 enum PErr {
     Fatal,
@@ -24,6 +25,7 @@ pub struct Parser<'a>{
     e: &'a ErrorHandler,
 
     // current token
+    last: Option<TokenSpan>,
     curr: Option<TokenSpan>,
     peek: Option<TokenSpan>,
 }
@@ -33,6 +35,7 @@ impl<'a> Parser<'a> {
         let mut p = Parser {
             tstr: lex,
             e: e,
+            last: None,
             curr: None,
             peek: None,
         };
@@ -45,8 +48,7 @@ impl<'a> Parser<'a> {
     // A TypeDecl is either a ClassDecl or InterfaceDecl
     pub fn parse_cunit(&mut self) -> PResult<ast::CUnit> {
         let mut cu = ast::CUnit {
-            imports: Vec::new(),
-            class: None,
+            items: Vec::new(),
         };
         loop {
             if self.curr.is_none() {
@@ -57,12 +59,13 @@ impl<'a> Parser<'a> {
             match curr.tok {
                 Token::Keyword(Keyword::Import) => {
                     self.bump();
-                    cu.imports.push(try!(self.parse_import()));
+                    cu.items.push(ast::Item::Import(try!(self.parse_import())));
                 },
                 // TODO: Detecting beginning of class is more complex. It could
                 // start with variouWass keywords and could be an interface.
                 Token::Keyword(Keyword::Public) | Token::Keyword(Keyword::Class) => {
-                    cu.class = Some(try!(self.parse_top_lvl_class()));
+                    let boxed = Box::new(try!(self.parse_top_lvl_class()));
+                    cu.items.push(ast::Item::Class(boxed));
                 }
                 _ => break,
             }
@@ -133,10 +136,10 @@ impl<'a> Parser<'a> {
         Ok(mods)
     }
 
-    fn parse_top_lvl_class(&mut self) -> PResult<ast::TopLevelClass> {
-        let mut c = ast::TopLevelClass {
+    fn parse_top_lvl_class(&mut self) -> PResult<ast::Class> {
+        let mut c = ast::Class {
+            name: ast::Ident::default(),
             vis: ast::Visibility::Package,
-            name: "".to_string(),
             methods: Vec::new(),
         };
 
@@ -159,7 +162,7 @@ impl<'a> Parser<'a> {
         try!(self.eat(Token::Keyword(Keyword::Class)));
 
         // `class` was parsed, next token should be class name
-        c.name = try!(self.eat_word());
+        c.name = try!(self.eat_ident());
 
         // TODO: Type Params
         // TODO: Super class
@@ -180,10 +183,10 @@ impl<'a> Parser<'a> {
             let mmods = try!(self.parse_modifiers());
 
             // Next up will be a type
-            let ty = try!(self.eat_word());
+            let ty = try!(self.eat_ident());
 
             // Next up: Method name or first field name
-            let name = try!(self.eat_word());
+            let name = try!(self.eat_ident());
 
             // At this point we can finally decide what we are parsing: If it's
             // a method, the next token needs to be a `(`. If it's a field it
@@ -200,7 +203,6 @@ impl<'a> Parser<'a> {
                     self.bump();
                 }
                 o @ _ => {
-                    let ex =
                     return Err(self.err_unexpected(
                         &[Token::OpenDelim(DelimToken::Paren), Token::Semi,
                         Token::Eq, Token::Comma], o));
@@ -212,7 +214,7 @@ impl<'a> Parser<'a> {
         Ok(c)
     }
 
-    fn parse_method(&mut self, name: String, ret_ty: String, mods: ModifiersAtSpans)
+    fn parse_method(&mut self, name: ast::Ident, ret_ty: ast::Ident, mods: ModifiersAtSpans)
         -> PResult<ast::Method> {
         let mut meth = ast::Method {
             vis: ast::Visibility::Package,
@@ -270,15 +272,15 @@ impl<'a> Parser<'a> {
 
         while !try!(self.eat_maybe(Token::CloseDelim(DelimToken::Paren))) {
             let mut param = ast::FormalParameter {
-                ty: "".to_string(),
-                name: "".to_string(),
+                ty: ast::Ident::default(),
+                name: ast::Ident::default(),
                 dims: 0,
                 final_: false,
             };
             param.final_ = try!(self.eat_maybe(Token::Keyword(Keyword::Final)));
-            param.ty = try!(self.eat_word());  // type
+            param.ty = try!(self.eat_ident());  // type
             param.dims = try!(self.parse_dims());
-            param.name = try!(self.eat_word());  // name
+            param.name = try!(self.eat_ident());  // name
             if param.dims == 0 {
                 param.dims = try!(self.parse_dims());
             }
@@ -314,7 +316,7 @@ impl<'a> Parser<'a> {
         let mut name = ast::Name { path: Vec::new(), last: None };
 
         // The first token after `import` needs to be a word.
-        let mut w = try!(self.eat_word());
+        let mut w = try!(self.eat_ident());
 
         loop {
             match try!(self.curr()).tok {
@@ -339,9 +341,8 @@ impl<'a> Parser<'a> {
                     try!(self.eat(Token::Semi));
                     return Ok(ast::Import::Wildcard(name));
                 },
-                Token::Word(s) => {
-                    self.bump();
-                    w = s;
+                Token::Word(..) => {
+                    w = try!(self.eat_ident());
                 },
                 f @ _ => return Err(self.err_unexpected(
                     &[Token::Star, Token::Word("".to_string())], f)),
@@ -349,13 +350,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn eat_word(&mut self) -> PResult<String> {
+    fn eat_ident(&mut self) -> PResult<ast::Ident> {
         let curr = try!(self.curr());
 
-        match curr.tok {
-            Token::Word(s) => {
+        match curr {
+            TokenSpan { tok: Token::Word(name), span } => {
                 self.bump();
-                Ok(s)
+                Ok(ast::Ident { name: name, span: span } )
             },
             _ => Err(self.err_unexpected(&[Token::Word("".to_string())], curr.clone().tok)),
         }
@@ -394,7 +395,8 @@ impl<'a> Parser<'a> {
 
     // Advances by one token
     fn bump(&mut self) {
-        swap(&mut self.curr, &mut self.peek);
+        swap(&mut self.last, &mut self.curr);  // last = curr
+        swap(&mut self.curr, &mut self.peek);  // curr = peek
         self.peek = self.tstr.next_real();
     }
 

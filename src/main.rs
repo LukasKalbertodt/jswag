@@ -11,6 +11,7 @@ use syntax::parser::Parser;
 mod syntax;
 mod diagnostics;
 mod filemap;
+mod style;
 
 
 fn main() {
@@ -23,8 +24,14 @@ fn main() {
 
     let toks = Box::new(syntax::Tokenizer::new(&filemap, &error_handler));
     let mut parser = Parser::new(toks, &error_handler);
-    let cu = parser.parse_cunit();
-    println!("{:?}", cu.ok());
+    let checker = style::Checker::new(&error_handler);
+
+
+    match parser.parse_cunit() {
+        Ok(cu) => checker.check(&cu),
+        _ => {}
+    }
+    // println!("{:?}", cu.ok());
 
 
     // let reals = toks.filter(|t| t.tok.is_real());
