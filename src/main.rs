@@ -16,7 +16,7 @@ mod style;
 
 
 fn main() {
-    let filemap = match open_file(Path::new("Quersumme.java")) {
+    let filemap = match open_file(Path::new("examples/Quersumme.java")) {
         Err(e) => panic!("Error opening file: {}", e.description()),
         Ok(fmap) => fmap,
     };
