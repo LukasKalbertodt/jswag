@@ -7,6 +7,7 @@ use filemap::open_file;
 use diagnostics::ErrorHandler;
 use term_painter::{Color, ToStyle};
 use syntax::parser::Parser;
+use std::default::Default;
 
 mod syntax;
 mod diagnostics;
@@ -21,10 +22,11 @@ fn main() {
     };
 
     let error_handler = ErrorHandler::new(filemap.clone());
+    let style_config = style::Config::default();
 
     let toks = Box::new(syntax::Tokenizer::new(&filemap, &error_handler));
     let mut parser = Parser::new(toks, &error_handler);
-    let checker = style::Checker::new(&error_handler);
+    let checker = style::Checker::new(&error_handler, &style_config);
 
 
     match parser.parse_cunit() {

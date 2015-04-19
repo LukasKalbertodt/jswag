@@ -7,7 +7,7 @@ import AlgoTools.*;
  * Liest eine Zahl >= 0 ein und gibt die Quersumme der Zahl aus.
  */
 
-public class Quersumme {
+public class Quersumme_test {
   public static float pi = 3.1415926;
 
   public static void main(String[] args) {

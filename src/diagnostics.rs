@@ -37,8 +37,14 @@ impl ErrorHandler {
             // Print spaces until the span start is reached
             print!("{0:>1$}", " ", pre.len() + start.col);
 
+            let uline_len = 1 + if end.col < start.col {
+                start.col - end.col
+            } else {
+                end.col-start.col
+            };
+
             ucol.with(|| {
-                println!("{:-<1$}", "^", end.col-start.col+1);
+                println!("{:-<1$}", "^", uline_len);
             });
 
         } else {

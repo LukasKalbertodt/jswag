@@ -414,7 +414,7 @@ impl<'a> Parser<'a> {
 
     // Error reporting stuff
     fn err_eof(&self) -> PErr {
-        self.e.err("Expected token, found '<eof'>!");
+        self.e.err("Expected token, found '<eof>'!");
         PErr::Fatal
     }
 

@@ -128,12 +128,16 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn scan_real(&mut self) -> String {
+        // At this point `curr` needs to be either a letter or underscore
         let mut s = String::new();
         // Break if its whitespace or None (whitespace in that case)
         loop {
             match self.curr.unwrap_or(' ') {
-                'a' ... 'z' | 'A' ... 'Z' => {
-                    s.push(self.curr.unwrap());
+                c @ 'a' ... 'z' |
+                c @ 'A' ... 'Z' |
+                c @ '0' ... '9' |
+                c @ '_' => {
+                    s.push(c);
                 },
                 _ => break,
             }
