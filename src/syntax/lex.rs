@@ -42,7 +42,7 @@ pub struct Tokenizer<'a> {
 
     /// Used for translation of unicode escapes. Do not use directly
     upeek: Option<char>,
-    peek_was_escaped: bool,
+    escaped_peek: u8,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -64,7 +64,7 @@ impl<'a> Tokenizer<'a> {
             peek_pos: 0,
             token_start: 0,
             upeek: None,
-            peek_was_escaped: false,
+            escaped_peek: 0,
         };
         tok.dbump();
         tok
@@ -98,21 +98,33 @@ impl<'a> Tokenizer<'a> {
         self.last_pos = self.curr_pos;
         self.curr_pos = self.peek_pos;
         if let Some(c) = self.curr {
-            self.peek_pos += if self.peek_was_escaped {
-                self.peek_was_escaped = false;
-                6
+            self.peek_pos += if self.escaped_peek > 0 {
+                self.escaped_peek as usize
             } else {
                 c.len_utf8()
             };
+            self.escaped_peek = 0;
         }
 
-        // check for unicode escape
-        if self.peek == Some('\\') {
+        // Check for unicode escape. More information in section 3.3
+        if self.peek == Some('\\') && self.curr != Some('\\') {
             self.upeek = self.chs.next();
             if self.upeek == Some('u') {
                 // First of all: We need `upeek` just for the case that the
                 // char after '\' is not 'u'. So we reset it here.
                 self.upeek = None;
+
+                let mut pos_offset = 2;
+
+                // We use a temporary peekable iterator here to check for
+                // additional u's
+                let mut peekiter = self.chs.by_ref().peekable();
+
+                // After the first 'u' may follow arbitrarily many more 'u's...
+                while let Some(&'u') = peekiter.peek() {
+                    pos_offset += 1;
+                    peekiter.next();
+                }
 
                 // At this point we expect 4 hexadecimal digits. Try to read
                 // all four and convert them to int. We count the digits we
@@ -121,7 +133,7 @@ impl<'a> Tokenizer<'a> {
                 let mut value = 0;
                 let mut num_digits = 0;
                 let mut interrupt = None;
-                for c in self.chs.by_ref().take(4) {
+                for c in peekiter.by_ref().take(4) {
                     match c.to_digit(16) {
                         Some(v) => {
                             // converting: Shifting left by 12, 8, 4 and 0.
@@ -141,7 +153,7 @@ impl<'a> Tokenizer<'a> {
                     self.diag.span_err(
                         Span {
                             lo: self.peek_pos,
-                            hi: self.peek_pos + 1 + num_digits,
+                            hi: self.peek_pos + pos_offset - 1 + num_digits,
                         },
                         "Invalid unicode escape (less than 4 digits)".into()
                     );
@@ -152,26 +164,26 @@ impl<'a> Tokenizer<'a> {
                     self.peek = interrupt;
 
                     // update position accordingly
-                    self.peek_pos += 2 + num_digits;
+                    self.peek_pos += pos_offset + num_digits;
                 } else {
                     // we read all 4 digits and converted them to int. Now use
                     // that value to create a new char and save it into peek.
                     self.peek = match ::std::char::from_u32(value) {
                         Some(c) => {
-                            self.peek_was_escaped = true;
+                            self.escaped_peek = 4 + pos_offset as u8;
                             Some(c)
                         },
                         None => {
                             self.diag.span_err(
                                 Span {
                                     lo: self.peek_pos,
-                                    hi: self.peek_pos + 5,
+                                    hi: self.peek_pos + pos_offset - 1 + 4,
                                 },
                                 "Invalid unicode escape (not a valid unicode \
                                     scalar value)".into()
                             );
-                            self.peek_pos += 6;
-                            self.chs.next()
+                            self.peek_pos += pos_offset + 4;
+                            peekiter.next()
                         }
                     };
                 }

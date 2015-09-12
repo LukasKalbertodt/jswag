@@ -69,24 +69,42 @@ fn int_literals() {
 
 #[test]
 fn unicode_escapes() {
-    assert_eq!(spans(r"a\u0078a"), vec![
+    // correct
+    assert_eq!(spans(r"z\u0078z"), vec![
         TokenSpan {
-            tok: Token::Word("axa".into()),
+            tok: Token::Word("zxz".into()),
             span: Span { lo: 0, hi: 7 }
         }
     ]);
-    assert_eq!(spans(r"a\u00_a"), vec![
+    // too few hex digits
+    assert_eq!(spans(r"z\u00z"), vec![
         TokenSpan {
-            tok: Token::Word("a_a".into()),
-            span: Span { lo: 0, hi: 6 }
+            tok: Token::Word("zz".into()),
+            span: Span { lo: 0, hi: 5 }
         }
     ]);
-    assert_eq!(spans(r"a\udecea"), vec![
+    // value is not a valid unicode scalar
+    assert_eq!(spans(r"z\udecez"), vec![
         TokenSpan {
-            tok: Token::Word("aa".into()),
+            tok: Token::Word("zz".into()),
             span: Span { lo: 0, hi: 7 }
         }
     ]);
+    // correct with multiple 'u's
+    assert_eq!(spans(r"z\uuuu0078z"), vec![
+        TokenSpan {
+            tok: Token::Word("zxz".into()),
+            span: Span { lo: 0, hi: 10 }
+        }
+    ]);
+    // backslashes that are not eligible
+    // currently the lexer stops at backslash... enable this test again later!
+    // assert_eq!(spans(r"z\\uuuu0078z"), vec![
+    //     TokenSpan {
+    //         tok: Token::Word(r"z\\uuuu0078z".into()),
+    //         span: Span { lo: 0, hi: 11 }
+    //     }
+    // ]);
 }
 
 #[test]
