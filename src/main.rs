@@ -6,7 +6,7 @@ use std::error::Error;
 use filemap::open_file;
 use diagnostics::ErrorHandler;
 use term_painter::{Color, ToStyle};
-use syntax::parser::Parser;
+use syntax::parse::Parser;
 use std::default::Default;
 
 mod syntax;

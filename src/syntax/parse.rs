@@ -1,6 +1,6 @@
 use std::iter::{Iterator};
 use super::token::*;
-use super::lexer::{Tokenizer, TokenSpan};
+use super::lex::Tokenizer;
 use std::boxed::Box;
 use super::ast;
 use filemap::Span;

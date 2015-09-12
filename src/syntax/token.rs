@@ -1,6 +1,19 @@
+// TODO: Remove
+#![allow(dead_code)]
+
 /// Module `token`:
 /// Contains enums and structs, that describe token types in Java.
 use std::fmt::{Display, Formatter, Error};
+use filemap::Span;
+
+
+
+#[derive(Debug, Clone)]
+pub struct TokenSpan {
+    pub tok: Token,
+    /// Byte position of token in Filemap
+    pub span: Span,
+}
 
 // Macro to reduce repeated code for keywords.
 macro_rules! declare_keywords {(

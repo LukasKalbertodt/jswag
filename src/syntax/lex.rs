@@ -6,20 +6,25 @@ use filemap::{FileMap, Span, SrcIndex};
 use std::rc::Rc;
 
 
-#[derive(Debug, Clone)]
-pub struct TokenSpan {
-    pub tok: Token,
-    /// Byte position of token in Filemap
-    pub span: Span,
+pub enum Error {
+    Fatal
 }
 
 
+/// The Java Tokenizer.
+///
+/// This type takes the Java source code as string and produces a sequence of
+/// `Token`s. It reads the source string from front to back only once. During
+/// tokenization it will also detect newline characters and notifies the
+/// filemap about them.
+///
+/// It implements the `Iterator` trait, yielding `TokenSpan`s.
 pub struct Tokenizer<'a> {
-    fmap: Rc<FileMap>,
+    /// Filemap containing the whole source code
+    fmap: &'a FileMap,
+    /// Iterator into the filemaps's source code to easily obtain chars
     chs: Chars<'a>,
-
-    // line_breaks: Vec<i64>,
-
+    /// Error handler to report errors during lexing
     diag: &'a ErrorHandler,
 
     last: Option<char>,
@@ -31,18 +36,18 @@ pub struct Tokenizer<'a> {
     curr_pos: SrcIndex,
     /// Byte offset when parsing the current token started
     token_start: SrcIndex,
-
-    fatal: bool,
 }
 
 impl<'a> Tokenizer<'a> {
-    /// Creates a new Tokenizer from a string.
-    pub fn new(fmap: &'a Rc<FileMap>, diag: &'a ErrorHandler) -> Tokenizer<'a> {
-        let iter = fmap.src.chars();
+    // =======================================================================
+    // Public methods of the Tokenizer
+    // =======================================================================
+    /// Creates a new Tokenizer with a reference to a filemap and to an error
+    /// handler to report errors.
+    pub fn new(fmap: &'a FileMap, diag: &'a ErrorHandler) -> Tokenizer<'a> {
         let mut tok = Tokenizer {
-            chs: iter,
-            fmap: fmap.clone(),
-            // line_breaks: Vec::new(),
+            chs: fmap.src.chars(),
+            fmap: fmap,
             diag: diag,
             last: None,
             curr: None,
@@ -50,22 +55,19 @@ impl<'a> Tokenizer<'a> {
             last_pos: 0,
             curr_pos: 0,
             token_start: 0,
-            fatal: false,
         };
-        // tok.chs = tok.fmap.src.chars();
         tok.dbump();
         tok
     }
 
+    /// Works like `next()` but will skip non-real Token (Whitespace, ...)
     pub fn next_real(&mut self) -> Option<TokenSpan> {
-        loop {
-            match self.next() {
-                Some(ref t) if !t.tok.is_real() => {},
-                t @ _ => return t,
-            }
-        }
+        self.find(|t| t.tok.is_real())
     }
 
+    // =======================================================================
+    // Private helper methods
+    // =======================================================================
     /// Reads a new char from the iterator, updating last, curr and peek + pos
     fn bump(&mut self) {
         self.last = self.curr;
@@ -73,16 +75,15 @@ impl<'a> Tokenizer<'a> {
         self.peek = self.chs.next();
 
         // Check if the last char is a line break and add to break list
-        if self.last.unwrap_or('x') == '\n' {
+        if let Some('\n') = self.last {
             self.fmap.add_line(self.curr_pos);
         }
 
+        // update last
         self.last_pos = self.curr_pos;
-        match self.peek {
-            Some(c) => self.curr_pos += c.len_utf8(),
-            _ => {}
-        };
-
+        if let Some(c) = self.peek {
+            self.curr_pos += c.len_utf8();
+        }
     }
 
     /// Calls `bump` twice. For less typing.
@@ -91,61 +92,66 @@ impl<'a> Tokenizer<'a> {
         self.bump();
     }
 
-    /// Calls `bump` until the first non-whitespace char is reached.
+    /// Convenience function to return a char iterator over `curr`. See
+    /// `CharIter` for more info.
+    fn iter<'b>(&'b mut self) -> CharIter<'b, 'a> {
+        CharIter::new(self)
+    }
+
+    /// Prints a fatal error message through error diagnostic
+    fn fatal_span(&mut self, m: &str) {
+        self.diag.span_err(
+            Span {
+                lo: self.token_start,
+                hi: self.curr_pos
+            },
+            m.to_string()
+        );
+    }
+
+    // =======================================================================
+    // Private skip and scan methods
+    // =======================================================================
+    /// Calls `bump` until the first non-whitespace char or EOF is reached.
     fn skip_whitespace(&mut self) {
-        while is_whitespace(self.curr.unwrap_or('x')) {
+        while self.curr.unwrap_or('x').is_whitespace() {
             self.bump();
         }
     }
 
-    // fn fatal(&mut self, m: &str) {
-    //     self.diag.error(m);
-    //     self.fatal = true;
-    // }
-
-    fn fatal_span(&mut self, m: &str) {
-        self.diag.span_err(Span { lo: self.token_start, hi: self.curr_pos},
-            m.to_string());
-        self.fatal = true;
-    }
-
-    /// Calls `bump` until the first char after the comment is reached. Skips
-    /// `/* */` and `//` comments.
+    /// Skips `/* */` and `//` comments. Calls `bump` until the first char
+    /// after the comment is reached.
+    ///
+    /// ## Preconditions
+    /// `curr` needs to be '/' and `peek` needs to be one of '*' and '/'
     fn skip_comment(&mut self) {
-        // We know curr == '/' and peek is either '*' or '/'.
         // Note: `self.peek.is_some()` implies `self.curr.is_some()`
-        if self.peek.unwrap() == '*' {
+        if let Some('*') = self.peek {
+            // Skip everything until the end of file or a "*/" is reached.
             while self.peek.is_some() &&
                 !(self.curr.unwrap() == '*' && self.peek.unwrap() == '/') {
                 self.bump();
             }
             self.dbump();   // skip last two chars
         } else {
-            while self.curr.is_some() && self.curr.unwrap() != '\n' {
+            // precondition tells us that `peek` is '/' here. Skip everything
+            // until line break is reached.
+            while self.curr.unwrap_or('\n') != '\n' {
                 self.bump();
             }
         }
     }
 
+    /// Scans a Java Identifier and returns it as a `String`. Section 3.8.
+    ///
+    /// ## Preconditions
+    /// `curr` needs to be a Java identifier start.
     fn scan_real(&mut self) -> String {
-        // At this point `curr` needs to be either a letter or underscore
-        let mut s = String::new();
-        // Break if its whitespace or None (whitespace in that case)
-        loop {
-            match self.curr.unwrap_or(' ') {
-                c @ 'a' ... 'z' |
-                c @ 'A' ... 'Z' |
-                c @ '0' ... '9' |
-                c @ '_' => {
-                    s.push(c);
-                },
-                _ => break,
-            }
-            self.bump();
-        }
-        s
+        // Collect all chars until the first non-ident char or EOF is reached.
+        self.iter().take_while(|&c| is_java_ident_part(c)).collect()
     }
 
+    /// Scans a string literal. Not finished yet!
     fn scan_string_literal(&mut self) -> String {
         // TODO: Escape shit
         // `curr` is '"'. Note: After one bump, `last` != None
@@ -253,7 +259,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         let t = match self.curr.unwrap() {
-            c if is_whitespace(c) => {
+            c if c.is_whitespace() => {
                 self.skip_whitespace();
                 Token::Whitespace
             },
@@ -331,13 +337,9 @@ impl<'a> Iterator for Tokenizer<'a> {
             },
             _ => {
                 self.fatal_span("Could not lex string");
-                Token::Whitespace   // Dummy token
+                return None;
             },
         };
-
-        if self.fatal {
-            return None;
-        }
 
         Some(TokenSpan {
             tok: t,
@@ -346,10 +348,76 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
+// ===========================================================================
+// Definition of a helper iterator
+// ===========================================================================
+/// Helper type to iterate over the current chars of the tokenizer. Only used
+/// by the tokenizer itself.
+///
+/// Whenever the iterator yields a char 'c', it is equal to `origin.curr`. That
+/// means that after using the iterator, `curr` of the original tokenizer
+/// equals the last char yielded by the iterator. However, the first char
+/// yielded is also `curr` of the tokenizer.
+/// It means that calling `next` n times will call `origin.bump()` n-1 times.
+struct CharIter<'tok, 's: 'tok> {
+    origin: &'tok mut Tokenizer<'s>,
+    first: bool,
+}
 
-fn is_whitespace(c: char) -> bool {
+impl<'tok, 's> CharIter<'tok, 's> {
+    fn new(orig: &'tok mut Tokenizer<'s>) -> CharIter<'tok, 's> {
+        CharIter {
+            origin: orig,
+            first: true,
+        }
+    }
+}
+
+impl<'tok, 's> Iterator for CharIter<'tok, 's> {
+    type Item = char;
+
+    fn next(&mut self) -> Option<char> {
+        if self.first {
+            self.first = false;
+        } else {
+            self.origin.bump();
+        }
+        self.origin.curr
+    }
+}
+
+// ===========================================================================
+// A bunch of helper functions
+// ===========================================================================
+
+/// Determines if the given character is a valid Java identifier start char
+/// (`JavaLetter`, section 3.8.).
+///
+/// This function does not match the exact definition! However, it returns the
+/// same values for all chars from `\u{0}` up to at least `\x{400}` as the
+/// function `isJavaIdentifierStart` from "openjdk8".
+fn is_java_ident_start(c: char) -> bool {
     match c {
-        ' ' | '\n' | '\t' | '\r' => true,
-        _ => false,
+        '$' | '_' | '¢' | '£' | '¤' | '¥' => true,
+        '\u{345}' | '\u{37f}' => false,
+        _ => c.is_alphabetic(),
+    }
+}
+
+/// Determines if the given character is a valid Java identifier char
+/// (`JavaLetterOrDigit`, section 3.8.).
+///
+/// This function does not match the exact definition! However, it returns the
+/// same values for all chars from `\u{0}` up to at least `\x{400}` as the
+/// function `isJavaIdentifierPart` from "openjdk8".
+fn is_java_ident_part(c: char) -> bool {
+    match c {
+        '\u{ad}'
+            | '\u{000}' ... '\u{008}'
+            | '\u{00e}' ... '\u{01b}'
+            | '\u{07f}' ... '\u{09f}'
+            | '\u{300}' ... '\u{374}' => true,
+        '\u{37f}' => false,
+        _ => c.is_numeric() || is_java_ident_start(c),
     }
 }
