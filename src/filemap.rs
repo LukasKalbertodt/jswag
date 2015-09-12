@@ -7,6 +7,7 @@ use std::borrow::BorrowMut;
 use std::cell::RefCell;
 
 pub type SrcIndex = usize;
+pub type LineIdx = usize;
 
 #[derive(Debug)]
 pub struct Loc {
@@ -15,9 +16,12 @@ pub struct Loc {
 }
 
 
-#[derive(Debug, Copy, Clone)]
+/// Span in the source string.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Span {
+    /// Inclusive
     pub lo: SrcIndex,
+    /// Exclusive
     pub hi: SrcIndex,
 }
 
@@ -30,11 +34,11 @@ pub struct FileMap {
 }
 
 impl FileMap {
-    fn new(filename: String, src: String) -> FileMap {
+    pub fn new(filename: String, src: String) -> FileMap {
         FileMap {
             filename: filename,
             src: src,
-            lines: RefCell::new(Vec::new()),
+            lines: RefCell::new(vec![0]),
         }
     }
 
@@ -63,19 +67,19 @@ impl FileMap {
                 a = m;
             }
         }
-        (a + 2)
+        a
     }
 
     pub fn get_loc(&self, offset: SrcIndex) -> Loc {
         let line = self.get_line_idx(offset);
-        let col = offset - (*self.lines.borrow())[(line - 2)] - 1;
+        let col = offset - (*self.lines.borrow())[line] - 1;
 
         Loc { line: line, col: col }
     }
 
-    pub fn get_line(&self, index: SrcIndex) -> String {
+    pub fn get_line(&self, index: LineIdx) -> String {
         // TODO: Maybe safety checks
-        let offset = self.lines.borrow()[index - 2] - 1;
+        let offset = self.lines.borrow()[index];
         let end = self.src[offset .. self.src.len()]
             .find("\n").unwrap_or(self.src.len());
         self.src[offset .. (end + offset)].to_string()

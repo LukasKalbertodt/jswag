@@ -8,7 +8,7 @@ use filemap::Span;
 
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TokenSpan {
     pub tok: Token,
     /// Byte position of token in Filemap
@@ -99,7 +99,8 @@ pub enum DelimToken {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Lit {
     Str(String),
-    Integer(String)
+    /// Raw number, long suffix, radix
+    Integer(String, bool, u8)
 }
 
 
@@ -124,7 +125,7 @@ pub enum Token {
     Gt,
     AndAnd,
     OrOr,
-    Not,
+    Bang,
     Tilde,
 
     Plus,
@@ -186,7 +187,7 @@ impl Token {
             Token::Gt => ">",
             Token::AndAnd => "&&",
             Token::OrOr => "||",
-            Token::Not => "!",
+            Token::Bang => "!",
             Token::Tilde => "~",
 
             Token::Plus => "+",

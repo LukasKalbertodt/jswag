@@ -27,13 +27,15 @@ pub struct Tokenizer<'a> {
     /// Error handler to report errors during lexing
     diag: &'a ErrorHandler,
 
+    /// Buffered chars for easy access
     last: Option<char>,
     curr: Option<char>,
     peek: Option<char>,
-    /// Byte offset of the last character read (curr)
-    last_pos: SrcIndex,
-    /// Byte offset of the next character to read (peek)
+
+    /// Byte offset of the corresponding char
     curr_pos: SrcIndex,
+    peek_pos: SrcIndex,
+
     /// Byte offset when parsing the current token started
     token_start: SrcIndex,
 }
@@ -52,8 +54,8 @@ impl<'a> Tokenizer<'a> {
             last: None,
             curr: None,
             peek: None,
-            last_pos: 0,
             curr_pos: 0,
+            peek_pos: 0,
             token_start: 0,
         };
         tok.dbump();
@@ -75,14 +77,14 @@ impl<'a> Tokenizer<'a> {
         self.peek = self.chs.next();
 
         // Check if the last char is a line break and add to break list
-        if let Some('\n') = self.last {
-            self.fmap.add_line(self.curr_pos);
+        if self.last == Some('\n') {
+            self.fmap.add_line(self.peek_pos);
         }
 
         // update last
-        self.last_pos = self.curr_pos;
-        if let Some(c) = self.peek {
-            self.curr_pos += c.len_utf8();
+        self.curr_pos = self.peek_pos;
+        if let Some(c) = self.curr {
+            self.peek_pos += c.len_utf8();
         }
     }
 
@@ -103,7 +105,7 @@ impl<'a> Tokenizer<'a> {
         self.diag.span_err(
             Span {
                 lo: self.token_start,
-                hi: self.curr_pos
+                hi: self.peek_pos
             },
             m.to_string()
         );
@@ -126,7 +128,7 @@ impl<'a> Tokenizer<'a> {
     /// `curr` needs to be '/' and `peek` needs to be one of '*' and '/'
     fn skip_comment(&mut self) {
         // Note: `self.peek.is_some()` implies `self.curr.is_some()`
-        if let Some('*') = self.peek {
+        if self.peek == Some('*') {
             // Skip everything until the end of file or a "*/" is reached.
             while self.peek.is_some() &&
                 !(self.curr.unwrap() == '*' && self.peek.unwrap() == '/') {
@@ -146,7 +148,7 @@ impl<'a> Tokenizer<'a> {
     ///
     /// ## Preconditions
     /// `curr` needs to be a Java identifier start.
-    fn scan_real(&mut self) -> String {
+    fn scan_ident(&mut self) -> String {
         // Collect all chars until the first non-ident char or EOF is reached.
         self.iter().take_while(|&c| is_java_ident_part(c)).collect()
     }
@@ -175,75 +177,94 @@ impl<'a> Tokenizer<'a> {
         s
     }
 
-    /// Scans a Java integer literal and returns it as a String. Parsing the
-    /// string as a number cannot be done at this point.
-    /// There are three types of integer literals in Java:
-    /// * `26`: Decimal
-    /// * `0x1a`: Hex
-    /// * `0b11010`: Binary
-    /// All types can have an 'l' or 'L' suffix (-> type long, int otherwise)
-    fn scan_integer_literal(&mut self) -> String {
-        // `curr` is '0' ... '9' here.
-
-        let mut s = String::new();
-
-        match self.peek {
-            Some(c) if (c == 'x' || c == 'X') && self.curr.unwrap() == '0' => {
-                s.push('0');
-                s.push(c);
-                self.dbump();
-
-                loop {
-                    match self.curr {
-                        Some(c) => match c {
-                            '0' ... '9' | 'a' ... 'f' | 'A' ... 'F' => {
-                                s.push(c);
-                                self.bump();
-                            },
-                            _ => break,
-                        },
-                        _ => break,
+    /// Scans a Java number literal and returns it. The literal may be a float
+    /// or a integer literal. See section 3.10.1 and 3.10.2.
+    ///
+    /// Parsing the string as a number could be done at this point in theory.
+    /// I need to think about it to find out if it makes sense.
+    ///
+    /// # Note
+    /// Parsing of floating point literals is not ready yet!
+    ///
+    /// ## Preconditions
+    /// `curr` needs to be in '0' ... '9'.
+    fn scan_number_literal(&mut self) -> Lit {
+        let (r, s) = match self.curr {
+            // if literal is starting with '0' (-> not decimal or single digit)
+            Some('0') => {
+                match self.peek.unwrap_or('\0') {
+                    // hexadecimal literal
+                    'x' | 'X' => {
+                        self.dbump();   // skip "0x"
+                        (16, self.scan_digits(16))
+                    },
+                    // binary literal
+                    'b' | 'B' => {
+                        self.dbump();   // skip "0b"
+                        (2, self.scan_digits(2))
+                    },
+                    // octal literal
+                    '0' ... '9' => {
+                        self.bump();   // skip "0"
+                        (8, self.scan_digits(8))
+                    },
+                    // just a '0'
+                    _ => {
+                        self.bump();
+                        (10, "0".into())
                     }
                 }
             },
-            Some(c) if (c == 'b' || c == 'B') && self.curr.unwrap() == '0' => {
-                s.push('0');
-                s.push(c);
-                self.dbump();
-
-                loop {
-                    match self.curr {
-                        Some(c) if c == '0' || c == '1' => {
-                            s.push(c);
-                            self.bump();
-                        },
-                        _ => break,
-                    }
-                }
-            },
-            // `peek` can actually be anything, e.g. ';' or ' ', even None
-            _ => {
-                loop {
-                    match self.curr {
-                        Some(c) => match c {
-                            '0' ... '9' => {
-                                s.push(c);
-                                self.bump();
-                            },
-                            _ => break,
-                        },
-                        _ => break,
-                    }
-                }
-            },
-        }
-
-        match self.curr {
-            Some(c) if c == 'l' || c == 'L' => s.push(c),
-            _ => {},
+            // literal starting with non-null digit (-> decimal)
+            _ => (10, self.scan_digits(10))
         };
 
-        s
+        // peek at the first char after the number for suffix detection
+        let mut long_suffix = false;
+        match self.curr.unwrap_or('0') {
+            'l' | 'L' => {
+                self.bump();
+                long_suffix = true;
+            },
+            _ => {},
+        }
+
+        Lit::Integer(s, long_suffix, r as u8)
+    }
+
+    /// Scans digits with the given radix and returns the scanned string.
+    ///
+    /// The parsing will skip underscores and will stop when a character is
+    /// found, that is no digit in the given radix. However, if the radix is
+    /// less than 10, all digits from 0 to 9 are scanned and an error is
+    /// printed for each digit that is too high for the given radix.
+    fn scan_digits(&mut self, radix: u32) -> String {
+        // We possibly scan more digits to report smart errors
+        let scan_radix = if radix <= 10 { 10 } else { radix };
+
+        let mut s = String::new();
+        loop {
+            match self.curr.unwrap_or('*') {
+                // skip underscores
+                '_' => {
+                    self.bump();
+                    continue;
+                },
+                c if c.to_digit(scan_radix).is_some() => {
+                    // check if the digit is valid in the given radix
+                    // TODO: Maybe stop lexing here
+                    if c.to_digit(radix).is_none() {
+                        self.diag.span_err(
+                            Span { lo: self.curr_pos, hi: self.curr_pos },
+                            format!("Invalid digit for base {} literal", radix)
+                        );
+                    }
+                    s.push(c);
+                    self.bump();
+                }
+                _ => return s,
+            }
+        }
     }
 }
 
@@ -281,7 +302,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '=' if p == '=' => { self.dbump(); Token::EqEq },
             '=' => { self.bump(); Token::Eq },
             '!' if p == '=' => { self.dbump(); Token::Ne },
-            '!' => { self.bump(); Token::Not },
+            '!' => { self.bump(); Token::Bang },
             '<' if p == '=' => { self.dbump(); Token::Le },
             '<' if p == '<' => {
                 self.dbump();
@@ -326,10 +347,10 @@ impl<'a> Iterator for Tokenizer<'a> {
             '~' => { self.bump(); Token::Tilde }
 
             '"' => Token::Literal(Lit::Str(self.scan_string_literal())),
-            '0' ... '9' => Token::Literal(Lit::Integer(self.scan_integer_literal())),
+            '0' ... '9' => Token::Literal(self.scan_number_literal()),
 
             'a' ... 'z' | 'A'... 'Z' => {
-                let w = self.scan_real();
+                let w = self.scan_ident();
                 match Keyword::from_str(&w) {
                     Some(kw) => Token::Keyword(kw),
                     None => Token::Word(w),

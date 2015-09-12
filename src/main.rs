@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+#![cfg_attr(test, allow(unused))]
 extern crate term_painter;
 
 use std::path::Path;
@@ -14,7 +14,6 @@ mod diagnostics;
 mod filemap;
 mod style;
 
-
 fn main() {
     let filemap = match open_file(Path::new("examples/Quersumme.java")) {
         Err(e) => panic!("Error opening file: {}", e.description()),
@@ -25,36 +24,36 @@ fn main() {
     let style_config = style::Config::default();
 
     let toks = Box::new(syntax::Tokenizer::new(&filemap, &error_handler));
-    let mut parser = Parser::new(toks, &error_handler);
-    let checker = style::Checker::new(&error_handler, &style_config);
+    // let mut parser = Parser::new(toks, &error_handler);
+    // let checker = style::Checker::new(&error_handler, &style_config);
 
 
-    match parser.parse_cunit() {
-        Ok(cu) => checker.check(&cu),
-        _ => {}
-    }
+    // match parser.parse_cunit() {
+    //     Ok(cu) => checker.check(&cu),
+    //     _ => {}
+    // }
     // println!("{:?}", cu.ok());
 
 
-    // let reals = toks.filter(|t| t.tok.is_real());
+    let reals = toks.filter(|t| t.tok.is_real());
 
     // // let mut t = term::stdout().unwrap();
 
     // // let mut old_line = 0;
-    // for tok in reals {
-    //     // printing line prefix
-    //     // let new_line = filemap.get_loc(tok.span.lo).line;
-    //     // if new_line > old_line {
-    //     //     for i in old_line .. new_line {
-    //     //         println!("");
-    //     //         colored!(t, BLUE, (print!("{:>2}: ", i + 1)));
-    //     //     }
-    //     //     old_line = new_line;
-    //     // }
+    for tok in reals {
+        // printing line prefix
+        // let new_line = filemap.get_loc(tok.span.lo).line;
+        // if new_line > old_line {
+        //     for i in old_line .. new_line {
+        //         println!("");
+        //         colored!(t, BLUE, (print!("{:>2}: ", i + 1)));
+        //     }
+        //     old_line = new_line;
+        // }
 
-    //     print!("{:?}{}", tok.tok, Color::Blue.paint("|"));
-    //     // colored!(t, BLUE, print!("|"));
+        print!("{:?}{}", tok.tok, Color::Blue.paint("|"));
+        // colored!(t, BLUE, print!("|"));
 
-    // }
-    // println!("");
+    }
+    println!("");
 }

@@ -4,4 +4,6 @@ pub mod ast;
 pub mod parse;
 
 pub use self::token::*;
-pub use self::lex::*;
+pub use self::lex::Tokenizer;
+
+mod test;
