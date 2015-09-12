@@ -59,7 +59,7 @@ impl ErrorHandler {
 
     pub fn span_err(&self, span: Span, m: String) {
         let start = self.fmap.get_loc(span.lo);
-        let end = self.fmap.get_loc(span.hi - 1);
+        let end = self.fmap.get_loc(span.hi);
 
         println!("");
         println!("{file}:{sl}:{sc} .. {el}:{ec}: {error} {m}",
@@ -74,7 +74,7 @@ impl ErrorHandler {
 
     pub fn span_note(&self, span: Span, m: String) {
         let start = self.fmap.get_loc(span.lo);
-        let end = self.fmap.get_loc(span.hi - 1);
+        let end = self.fmap.get_loc(span.hi);
 
         println!("");
         println!("{file}:{sl}:{sc} .. {el}:{ec}: {error} {m}",

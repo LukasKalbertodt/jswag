@@ -38,6 +38,9 @@ pub struct Tokenizer<'a> {
 
     /// Byte offset when parsing the current token started
     token_start: SrcIndex,
+
+    /// Used for translation of unicode escapes. Do not use directly
+    upeek: Option<char>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -57,6 +60,7 @@ impl<'a> Tokenizer<'a> {
             curr_pos: 0,
             peek_pos: 0,
             token_start: 0,
+            upeek: None,
         };
         tok.dbump();
         tok
@@ -74,7 +78,12 @@ impl<'a> Tokenizer<'a> {
     fn bump(&mut self) {
         self.last = self.curr;
         self.curr = self.peek;
-        self.peek = self.chs.next();
+        self.peek = if let Some(un) = self.upeek {
+            self.upeek = None;
+            Some(un)
+        } else {
+            self.chs.next()
+        };
 
         // Check if the last char is a line break and add to break list
         if self.last == Some('\n') {
@@ -86,6 +95,78 @@ impl<'a> Tokenizer<'a> {
         if let Some(c) = self.curr {
             self.peek_pos += c.len_utf8();
         }
+
+        // check for unicode escape
+        if self.peek == Some('\\') {
+            self.upeek = self.chs.next();
+            if self.upeek == Some('u') {
+                // First of all: We need `upeek` just for the case that the
+                // char after '\' is not 'u'. So we reset it here.
+                self.upeek = None;
+
+                // At this point we expect 4 hexadecimal digits. Try to read
+                // all four and convert them to int. We count the digits we
+                // read in `num_digits`. If a non-hexadecimal char is found,
+                // it'll be saved in `interrupt`.
+                let mut value = 0;
+                let mut num_digits = 0;
+                let mut interrupt = None;
+                for c in self.chs.by_ref().take(4) {
+                    match c.to_digit(16) {
+                        Some(v) => {
+                            // converting: Shifting left by 12, 8, 4 and 0.
+                            value += v << ((3-num_digits)*4);
+                            num_digits += 1;
+                        },
+                        None => {
+                            interrupt = Some(c);
+                            break;
+                        },
+                    }
+                }
+
+                // check if all four digits were supplied
+                if num_digits < 4 {
+                    // report error ...
+                    self.diag.span_err(
+                        Span {
+                            lo: self.peek_pos,
+                            hi: self.peek_pos + 1 + num_digits,
+                        },
+                        "Invalid unicode escape (less than 4 digits)".into()
+                    );
+                    println!("{} - {}", self.peek_pos, num_digits);
+                    // ... but ignore the wrong unicode escape.
+                    // If we couldn't read 4 digits because we reached EOF,
+                    // interrupt will be None. If the reason was a non-hex
+                    // char, it's saved in interrupt.
+                    self.peek = interrupt;
+                } else {
+                    // we read all 4 digits and converted them to int. Now use
+                    // that value to create a new char and save it into peek.
+                    self.peek = match ::std::char::from_u32(value) {
+                        Some(c) => Some(c),
+                        None => {
+                            self.diag.span_err(
+                                Span {
+                                    lo: self.peek_pos,
+                                    hi: self.peek_pos + 5,
+                                },
+                                "Invalid unicode escape (not a valid unicode \
+                                    scalar value)".into()
+                            );
+                            self.chs.next()
+                        }
+                    };
+                }
+                // update position accordingly
+                self.peek_pos += 2 + num_digits;
+            }
+        }
+
+        // println!("AFTER: {:?} {:?} {:?} || {} {}",
+        //     self.last, self.curr, self.peek,
+        //     self.curr_pos, self.peek_pos);
     }
 
     /// Calls `bump` twice. For less typing.

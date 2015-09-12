@@ -16,12 +16,10 @@ pub struct Loc {
 }
 
 
-/// Span in the source string.
+/// Span in the source string (fully inclusive)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Span {
-    /// Inclusive
     pub lo: SrcIndex,
-    /// Exclusive
     pub hi: SrcIndex,
 }
 
@@ -72,7 +70,7 @@ impl FileMap {
 
     pub fn get_loc(&self, offset: SrcIndex) -> Loc {
         let line = self.get_line_idx(offset);
-        let col = offset - (*self.lines.borrow())[line] - 1;
+        let col = offset - (*self.lines.borrow())[line];
 
         Loc { line: line, col: col }
     }
