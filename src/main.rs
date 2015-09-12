@@ -14,6 +14,7 @@ mod diagnostics;
 mod filemap;
 mod style;
 
+#[allow(unused)]
 fn main() {
     let filemap = match open_file(Path::new("examples/Quersumme.java")) {
         Err(e) => panic!("Error opening file: {}", e.description()),

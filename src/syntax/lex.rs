@@ -33,6 +33,7 @@ pub struct Tokenizer<'a> {
     peek: Option<char>,
 
     /// Byte offset of the corresponding char
+    last_pos: SrcIndex,
     curr_pos: SrcIndex,
     peek_pos: SrcIndex,
 
@@ -41,6 +42,7 @@ pub struct Tokenizer<'a> {
 
     /// Used for translation of unicode escapes. Do not use directly
     upeek: Option<char>,
+    peek_was_escaped: bool,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -57,10 +59,12 @@ impl<'a> Tokenizer<'a> {
             last: None,
             curr: None,
             peek: None,
+            last_pos: 0,
             curr_pos: 0,
             peek_pos: 0,
             token_start: 0,
             upeek: None,
+            peek_was_escaped: false,
         };
         tok.dbump();
         tok
@@ -91,9 +95,15 @@ impl<'a> Tokenizer<'a> {
         }
 
         // update last
+        self.last_pos = self.curr_pos;
         self.curr_pos = self.peek_pos;
         if let Some(c) = self.curr {
-            self.peek_pos += c.len_utf8();
+            self.peek_pos += if self.peek_was_escaped {
+                self.peek_was_escaped = false;
+                6
+            } else {
+                c.len_utf8()
+            };
         }
 
         // check for unicode escape
@@ -135,17 +145,22 @@ impl<'a> Tokenizer<'a> {
                         },
                         "Invalid unicode escape (less than 4 digits)".into()
                     );
-                    println!("{} - {}", self.peek_pos, num_digits);
                     // ... but ignore the wrong unicode escape.
                     // If we couldn't read 4 digits because we reached EOF,
                     // interrupt will be None. If the reason was a non-hex
                     // char, it's saved in interrupt.
                     self.peek = interrupt;
+
+                    // update position accordingly
+                    self.peek_pos += 2 + num_digits;
                 } else {
                     // we read all 4 digits and converted them to int. Now use
                     // that value to create a new char and save it into peek.
                     self.peek = match ::std::char::from_u32(value) {
-                        Some(c) => Some(c),
+                        Some(c) => {
+                            self.peek_was_escaped = true;
+                            Some(c)
+                        },
                         None => {
                             self.diag.span_err(
                                 Span {
@@ -155,12 +170,11 @@ impl<'a> Tokenizer<'a> {
                                 "Invalid unicode escape (not a valid unicode \
                                     scalar value)".into()
                             );
+                            self.peek_pos += 6;
                             self.chs.next()
                         }
                     };
                 }
-                // update position accordingly
-                self.peek_pos += 2 + num_digits;
             }
         }
 
@@ -445,7 +459,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
         Some(TokenSpan {
             tok: t,
-            span: Span { lo: self.token_start, hi: self.curr_pos },
+            span: Span { lo: self.token_start, hi: self.last_pos },
         })
     }
 }

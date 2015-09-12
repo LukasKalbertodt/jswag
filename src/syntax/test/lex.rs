@@ -68,45 +68,67 @@ fn int_literals() {
 }
 
 #[test]
+fn unicode_escapes() {
+    assert_eq!(spans(r"a\u0078a"), vec![
+        TokenSpan {
+            tok: Token::Word("axa".into()),
+            span: Span { lo: 0, hi: 7 }
+        }
+    ]);
+    assert_eq!(spans(r"a\u00_a"), vec![
+        TokenSpan {
+            tok: Token::Word("a_a".into()),
+            span: Span { lo: 0, hi: 6 }
+        }
+    ]);
+    assert_eq!(spans(r"a\udecea"), vec![
+        TokenSpan {
+            tok: Token::Word("aa".into()),
+            span: Span { lo: 0, hi: 7 }
+        }
+    ]);
+}
+
+#[test]
 fn basic_spans() {
     assert_eq!(spans("abc xyz"), vec![
         TokenSpan {
             tok: Token::Word("abc".into()),
-            span: Span { lo: 0, hi: 3 }
+            span: Span { lo: 0, hi: 2 }
         },
         TokenSpan {
             tok: Token::Whitespace,
-            span: Span { lo: 3, hi: 4 }
+            span: Span { lo: 3, hi: 3 }
         },
         TokenSpan {
             tok: Token::Word("xyz".into()),
-            span: Span { lo: 4, hi: 7 }
+            span: Span { lo: 4, hi: 6 }
         }
     ]);
 
     assert_eq!(spans(".xxxx=="), vec![
         TokenSpan {
             tok: Token::Dot,
-            span: Span { lo: 0, hi: 1 }
+            span: Span { lo: 0, hi: 0 }
         },
         TokenSpan {
             tok: Token::Word("xxxx".into()),
-            span: Span { lo: 1, hi: 5 }
+            span: Span { lo: 1, hi: 4 }
         },
         TokenSpan {
             tok: Token::EqEq,
-            span: Span { lo: 5, hi: 7 }
+            span: Span { lo: 5, hi: 6 }
         }
     ]);
 
     assert_eq!(spans("     !"), vec![
         TokenSpan {
             tok: Token::Whitespace,
-            span: Span { lo: 0, hi: 5 }
+            span: Span { lo: 0, hi: 4 }
         },
         TokenSpan {
             tok: Token::Bang,
-            span: Span { lo: 5, hi: 6 }
+            span: Span { lo: 5, hi: 5 }
         }
     ]);
 }
