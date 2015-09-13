@@ -4,11 +4,53 @@
 //! the Java language specification.
 //!
 
-// TODO: Remove
-#![allow(dead_code)]
-
 use std::fmt::{Display, Formatter, Error};
 use filemap::Span;
+
+// Macro to generate enums with helper methods
+macro_rules! gen_helper {
+    (
+        $name:ident; ;
+        $($variant:ident = $val:expr),+
+    ) => { };
+    (
+        $name:ident;
+        $helper:ident $(, $tail:ident)*;
+        $($variant:ident = $val:expr),+
+    ) => {
+        $helper!($name; $($variant = $val),+ );
+        gen_helper!($name; $($tail),*; $($variant = $val),+);
+    };
+}
+
+macro_rules! gen_enum {
+    (
+        $(#[$attr:meta])*
+        pub enum $name:ident;
+        with $($helper:ident),* for:
+        $($variant:ident = $val:expr),+
+    ) => {
+        $(
+            #[$attr]
+        )*
+        pub enum $name {
+            $($variant,)*
+        }
+        gen_helper!($name; $($helper),*; $( $variant = $val ),+);
+    }
+}
+
+macro_rules! to_java_string {
+    ($name:ident; $($variant:ident = $val:expr),+) => {
+        impl $name {
+            pub fn as_java_string(&self) -> &'static str {
+                match self {
+                    $( &$name::$variant => $val ,)*
+                }
+            }
+        }
+    }
+}
 
 
 /// A token with it's span in the source text
@@ -229,34 +271,68 @@ macro_rules! declare_keywords {(
 
     impl Display for Keyword {
         fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-            write!(f, "{}", self.as_java_string())
+            self.as_java_string().fmt(f)
         }
     }
 }}
 
-declare_keywords! {
-    // modifier
-    (Public,        "public");
-    (Protected,     "protected");
-    (Private,       "private");
-    (Abstract , "abstract");
-    (Static , "static");
-    (Final , "final");
-    (Synchronized , "synchronized");
-    (Native , "native");
-    (Strictfp , "strictfp");
-    (Transient , "transient");
-    (Volatile , "volatile");
 
-    (Class,         "class");
-    (Import,        "import");
 
-    // control structures
-    (Do,     "do");
-    (While,  "while");
-    (For,    "for");
-    (If,     "if");
-    (Else,   "else");
+gen_enum! {
+    #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+    pub enum Keyword;
+    with to_java_string for:
+
+    Abstract = "abstract",
+    Assert = "assert",
+    Boolean = "boolean",
+    Break = "break",
+    Byte = "byte",
+    Case = "case",
+    Catch = "catch",
+    Char = "char",
+    Class = "class",
+    Const = "const",
+    Continue = "continue",
+    Default = "default",
+    Do = "do",
+    Double = "double",
+    Else = "else",
+    Enum = "enum",
+    Extends = "extends",
+    Final = "final",
+    Finally = "finally",
+    Float = "float",
+    For = "for",
+    If = "if",
+    Goto = "goto",
+    Implements = "implements",
+    Import = "import",
+    Instanceof = "instanceof",
+    Int = "int",
+    Interface = "interface",
+    Long = "long",
+    Native = "native",
+    New = "new",
+    Package = "package",
+    Private = "private",
+    Protected = "protected",
+    Public = "public",
+    Return = "return",
+    Short = "short",
+    Static = "static",
+    Strictfp = "strictfp",
+    Super = "super",
+    Switch = "switch",
+    Synchronized = "synchronized",
+    This = "this",
+    Throw = "throw",
+    Throws = "throws",
+    Transient = "transient",
+    Try = "try",
+    Void = "void",
+    Volatile = "volatile",
+    While = "while"
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

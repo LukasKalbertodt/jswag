@@ -1,3 +1,4 @@
+#![allow(unused)]
 /// This module contains unit tests for the tokenizer.
 ///
 

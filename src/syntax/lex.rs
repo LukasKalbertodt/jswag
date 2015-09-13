@@ -12,12 +12,6 @@ use std::iter::Iterator;
 use super::token::*;
 use diagnostics::ErrorHandler;
 use filemap::{FileMap, Span, SrcIndex};
-use std::rc::Rc;
-
-
-pub enum Error {
-    Fatal
-}
 
 
 /// The Java Tokenizer.
