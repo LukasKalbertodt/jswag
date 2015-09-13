@@ -89,9 +89,11 @@ impl<'a> Tokenizer<'a> {
             self.chs.next()
         };
 
-        // Check if the last char is a line break and add to break list
-        if self.last == Some('\n') {
-            self.fmap.add_line(self.peek_pos);
+        // Check if the current char is a line break and add to line break list
+        // Division into lines specified in section 3.4
+        if self.curr == Some('\r')
+            || (self.curr == Some('\n') && self.last != Some('\r')) {
+            self.fmap.add_line(self.curr_pos);
         }
 
         // update last
@@ -190,6 +192,18 @@ impl<'a> Tokenizer<'a> {
             }
         }
 
+        // Check if peek is the SUB character to ignore it, if it is the last
+        // character in the input stream (section 3.5)
+        if self.peek == Some('\u{001a}') {
+            self.upeek = self.chs.next();
+
+            // If peek is the last char in the input stream, we ignore the
+            // SUB character
+            if self.upeek == None {
+                self.peek = None
+            }
+        }
+
         // println!("AFTER: {:?} {:?} {:?} || {} {}",
         //     self.last, self.curr, self.peek,
         //     self.curr_pos, self.peek_pos);
@@ -238,15 +252,18 @@ impl<'a> Tokenizer<'a> {
         if self.peek == Some('*') {
             // Skip everything until the end of file or a "*/" is reached.
             while self.peek.is_some() &&
-                !(self.curr.unwrap() == '*' && self.peek.unwrap() == '/') {
+                !(self.curr == Some('*') && self.peek == Some('/')) {
                 self.bump();
             }
             self.dbump();   // skip last two chars
         } else {
             // precondition tells us that `peek` is '/' here. Skip everything
             // until line break is reached.
-            while self.curr.unwrap_or('\n') != '\n' {
-                self.bump();
+            loop {
+                match self.curr {
+                    None | Some('\n') | Some('\r') => break,
+                    _ => self.bump(),
+                }
             }
         }
     }
@@ -271,7 +288,8 @@ impl<'a> Tokenizer<'a> {
             match self.curr {
                 Some(c) if c == '"' && self.last.unwrap() != '\\' => break,
                 None => {
-                    self.fatal_span("Unexpected EOF while lexing string literal");
+                    self.fatal_span("Unexpected EOF while lexing \
+                        string literal");
                     break;
                 },
                 Some(c) => {
