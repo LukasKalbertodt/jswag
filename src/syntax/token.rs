@@ -1,19 +1,204 @@
+//! This module defines basic token types
+//!
+//! The definition of Java tokens is mostly in section 3 (lexical structure) of
+//! the Java language specification.
+//!
+
 // TODO: Remove
 #![allow(dead_code)]
 
-/// Module `token`:
-/// Contains enums and structs, that describe token types in Java.
 use std::fmt::{Display, Formatter, Error};
 use filemap::Span;
 
 
-
+/// A token with it's span in the source text
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenSpan {
     pub tok: Token,
     /// Byte position of token in Filemap
     pub span: Span,
 }
+
+/// A Java token
+///
+/// This enum differs a bit from the original definition in the Java spec, in
+/// which this `Token` is called *InputElement* and is defined as:
+/// ```
+/// WhiteSpace  |  Comment  |  Token
+/// ```
+/// The Java-*Token* is defined as:
+/// ```
+/// Identifier  |  Keyword  |  Literal  |  Seperator  |  Operator
+/// ```
+///
+/// This `Token` type differs from the formal and correct definition to make
+/// the parser and lexer module less verbose. The differences are:
+/// - all 5 variants of the Java-*Token* are direct variants of this `Token`
+/// - therefore the name Java-*Token* is not necessary and Java's
+///   *InputElement* is called `Token` instead
+/// - *Seperator*s and *Operator*s are also direct variants of this `Token`
+///
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Token {
+    // Variants of the Java-*InputElement* (not "real" tokens)
+    Whitespace,
+    Comment,
+
+    // Variants of the Java-*Token*
+    Ident(String),
+    Keyword(Keyword),
+    Literal(Lit),
+
+    // Variants of Java-*Seperator*
+    // (   )   {   }   [   ]   ;   ,   .   ...   @   ::
+    ParenOp,
+    ParenCl,
+    BracketOp,
+    BracketCl,
+    BraceOp,
+    BraceCl,
+    Semi,
+    Comma,
+    Dot,
+    DotDotDot,
+    At,
+    ColonSep,
+
+    // Variants of Java-*Operator*
+    // =   >   <   !   ~   ?   :   ->
+    Eq,
+    Gt,
+    Lt,
+    Bang,
+    Tilde,
+    Question,
+    Colon,
+    Arrow,
+
+    // ==  >=  <=  !=  &&  ||  ++  --
+    EqEq,
+    Ge,
+    Le,
+    Ne,
+    AndAnd,
+    OrOr,
+    PlusPlus,
+    MinusMinus,
+
+    // +   -   *   /   &   |   ^   %   <<   >>   >>>
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    And,
+    Or,
+    Caret,
+    Percent,
+    Shl,
+    Shr,
+    ShrUn,
+
+    // +=  -=  *=  /=  &=  |=  ^=  %=  <<=  >>=  >>>=
+    PlusEq,
+    MinusEq,
+    StarEq,
+    SlashEq,
+    AndEq,
+    OrEq,
+    CaretEq,
+    PercentEq,
+    ShlEq,
+    ShrEq,
+    ShrUnEq,
+}
+
+impl Token {
+    /// Returns true if the token is a "real" token (aka. a Java-*Token*)
+    pub fn is_real(&self) -> bool {
+        match *self {
+            Token::Whitespace | Token::Comment => false,
+            _ => true,
+        }
+    }
+
+    /// String for error reporting. Example:
+    /// ```
+    /// Excpected one of `,` `;` `)`
+    /// ```
+    pub fn as_java_string(&self) -> &'static str {
+        use self::Token::*;
+        match self.clone() {
+            Whitespace => "whitespace",
+            Comment => "comment",
+
+            Ident(_) => "identifier",
+            Keyword(keyword) => keyword.as_java_string(),
+            Literal(..) => "Lit(???)",
+
+            ParenOp => "(",
+            ParenCl => ")",
+            BracketOp => "[",
+            BracketCl => "]",
+            BraceOp => "{",
+            BraceCl => "}",
+            Semi => ";",
+            Comma => ",",
+            Dot => ".",
+            DotDotDot => "...",
+            At => "@",
+            ColonSep => "::",
+
+            Eq => "=",
+            Gt => ">",
+            Lt => "<",
+            Bang => "!",
+            Tilde => "~",
+            Question => "?",
+            Colon => ":",
+            Arrow => "->",
+
+            EqEq => "==",
+            Ge => ">=",
+            Le => "<=",
+            Ne => "!=",
+            AndAnd => "&&",
+            OrOr => "||",
+            PlusPlus => "++",
+            MinusMinus => "--",
+
+            Plus => "+",
+            Minus => "-",
+            Star => "*",
+            Slash => "/",
+            And => "&",
+            Or => "|",
+            Caret => "^",
+            Percent => "%",
+            Shl => "<<",
+            Shr => ">>",
+            ShrUn => ">>>",
+
+            PlusEq => "+=",
+            MinusEq => "-=",
+            StarEq => "*=",
+            SlashEq => "/=",
+            AndEq => "&=",
+            OrEq => "|=",
+            CaretEq => "^=",
+            PercentEq => "%=",
+            ShlEq => "<<=",
+            ShrEq => ">>=",
+            ShrUnEq => ">>>=",
+        }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}", self.as_java_string())
+    }
+}
+
 
 // Macro to reduce repeated code for keywords.
 macro_rules! declare_keywords {(
@@ -74,174 +259,9 @@ declare_keywords! {
     (Else,   "else");
 }
 
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BinOpToken {
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Percent,
-    Caret,
-    And,
-    Or,
-    Shl,
-    Shr,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum DelimToken {
-    Paren,      // round ( )
-    Bracket,    // square [ ]
-    Brace,      // curly { }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Lit {
     Str(String),
     /// Raw number, long suffix, radix
     Integer(String, bool, u8)
-}
-
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Token {
-    // Ignored tokens
-    Whitespace,
-    Comment,
-
-    // Simple one char tokens
-    Dot,
-    Comma,
-    Semi,
-
-    // Operators
-    Eq,
-    Lt,
-    Le,
-    EqEq,
-    Ne,
-    Ge,
-    Gt,
-    AndAnd,
-    OrOr,
-    Bang,
-    Tilde,
-
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Percent,
-    Caret,
-    And,
-    Or,
-    Shl,
-    Shr,
-
-    PlusEq,
-    MinusEq,
-    StarEq,
-    SlashEq,
-    PercentEq,
-    CaretEq,
-    AndEq,
-    OrEq,
-    ShlEq,
-    ShrEq,
-
-    // Long string tokens
-    Keyword(Keyword),
-    Word(String),
-
-    Literal(Lit),
-
-    OpenDelim(DelimToken),
-    CloseDelim(DelimToken),
-}
-
-impl Token {
-    // Returns true if the token is not an ignored token (whitespace/comment)
-    pub fn is_real(&self) -> bool {
-        match *self {
-            Token::Whitespace | Token::Comment => false,
-            _ => true,
-        }
-    }
-
-    pub fn as_java_string(&self) -> String {
-        match self.clone() {
-            Token::Whitespace => "'whitespace'",
-            Token::Comment => "'comment'",
-
-            Token::Dot => ".",
-            Token::Comma => ",",
-            Token::Semi => ";",
-
-            Token::Eq => "=",
-            Token::Lt => "<",
-            Token::Le => "<=",
-            Token::EqEq => "==",
-            Token::Ne => "!=",
-            Token::Ge => ">=",
-            Token::Gt => ">",
-            Token::AndAnd => "&&",
-            Token::OrOr => "||",
-            Token::Bang => "!",
-            Token::Tilde => "~",
-
-            Token::Plus => "+",
-            Token::Minus => "-",
-            Token::Star => "*",
-            Token::Slash => "/",
-            Token::Percent => "%",
-            Token::Caret => "^",
-            Token::And => "&",
-            Token::Or => "|",
-            Token::Shl => "<<",
-            Token::Shr => ">>",
-
-            Token::PlusEq => "+=",
-            Token::MinusEq => "-=",
-            Token::StarEq => "*=",
-            Token::SlashEq => "/=",
-            Token::PercentEq => "%=",
-            Token::CaretEq => "^=",
-            Token::AndEq => "&=",
-            Token::OrEq => "|=",
-            Token::ShlEq => "<<=",
-            Token::ShrEq => ">>=",
-
-            Token::Keyword(keyword) => keyword.as_java_string(),
-            // Token::Word(ref w) => format!("Word('{}')", w).as_str() ,
-            Token::Word(ref w) => {
-                if w.is_empty() {
-                    "Ident"
-                } else {
-                    w.as_ref()
-                }
-            },
-
-            Token::Literal(..) => "Lit(???)",
-
-            Token::OpenDelim(delim) => match delim {
-                DelimToken::Brace => "{",
-                DelimToken::Paren => "(",
-                DelimToken::Bracket => "[",
-            },
-            Token::CloseDelim(delim) => match delim {
-                DelimToken::Brace => "}",
-                DelimToken::Paren => ")",
-                DelimToken::Bracket => "]",
-            },
-
-            // _ => "'???'",
-        }.to_string()
-    }
-}
-
-impl Display for Token {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}", self.as_java_string())
-    }
 }

@@ -28,17 +28,17 @@ fn empty() {
 
 #[test]
 fn idents() {
-    assert_eq!(toks("foo"), vec![Token::Word("foo".into())]);
+    assert_eq!(toks("foo"), vec![Token::Ident("foo".into())]);
     assert_eq!(toks("foo bar"), vec![
-        Token::Word("foo".into()),
+        Token::Ident("foo".into()),
         Token::Whitespace,
-        Token::Word("bar".into()),
+        Token::Ident("bar".into()),
     ]);
     assert_eq!(toks("1bla"), vec![
         Token::Literal(Lit::Integer("1".into(), false, 10)),
-        Token::Word("bla".into())
+        Token::Ident("bla".into())
     ]);
-    assert_eq!(toks("b1la"), vec![Token::Word("b1la".into())]);
+    assert_eq!(toks("b1la"), vec![Token::Ident("b1la".into())]);
 
 }
 
@@ -72,28 +72,28 @@ fn unicode_escapes() {
     // correct
     assert_eq!(spans(r"z\u0078z"), vec![
         TokenSpan {
-            tok: Token::Word("zxz".into()),
+            tok: Token::Ident("zxz".into()),
             span: Span { lo: 0, hi: 7 }
         }
     ]);
     // too few hex digits
     assert_eq!(spans(r"z\u00z"), vec![
         TokenSpan {
-            tok: Token::Word("zz".into()),
+            tok: Token::Ident("zz".into()),
             span: Span { lo: 0, hi: 5 }
         }
     ]);
     // value is not a valid unicode scalar
     assert_eq!(spans(r"z\udecez"), vec![
         TokenSpan {
-            tok: Token::Word("zz".into()),
+            tok: Token::Ident("zz".into()),
             span: Span { lo: 0, hi: 7 }
         }
     ]);
     // correct with multiple 'u's
     assert_eq!(spans(r"z\uuuu0078z"), vec![
         TokenSpan {
-            tok: Token::Word("zxz".into()),
+            tok: Token::Ident("zxz".into()),
             span: Span { lo: 0, hi: 10 }
         }
     ]);
@@ -101,7 +101,7 @@ fn unicode_escapes() {
     // currently the lexer stops at backslash... enable this test again later!
     // assert_eq!(spans(r"z\\uuuu0078z"), vec![
     //     TokenSpan {
-    //         tok: Token::Word(r"z\\uuuu0078z".into()),
+    //         tok: Token::Ident(r"z\\uuuu0078z".into()),
     //         span: Span { lo: 0, hi: 11 }
     //     }
     // ]);
@@ -111,7 +111,7 @@ fn unicode_escapes() {
 fn basic_spans() {
     assert_eq!(spans("abc xyz"), vec![
         TokenSpan {
-            tok: Token::Word("abc".into()),
+            tok: Token::Ident("abc".into()),
             span: Span { lo: 0, hi: 2 }
         },
         TokenSpan {
@@ -119,7 +119,7 @@ fn basic_spans() {
             span: Span { lo: 3, hi: 3 }
         },
         TokenSpan {
-            tok: Token::Word("xyz".into()),
+            tok: Token::Ident("xyz".into()),
             span: Span { lo: 4, hi: 6 }
         }
     ]);
@@ -130,7 +130,7 @@ fn basic_spans() {
             span: Span { lo: 0, hi: 0 }
         },
         TokenSpan {
-            tok: Token::Word("xxxx".into()),
+            tok: Token::Ident("xxxx".into()),
             span: Span { lo: 1, hi: 4 }
         },
         TokenSpan {

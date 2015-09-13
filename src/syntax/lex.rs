@@ -1,5 +1,14 @@
+//! This module contains the lexing functionality
+//!
+//! The main type is the Tokenizer that will take the Java source code and
+//! produces a sequence of tokens out of it.
+//!
+//! Most details of this module are defined in section 3 (lexical structure) of
+//! the Java language specification.
+//!
+
 use std::str::Chars;
-use std::iter::{Iterator};
+use std::iter::Iterator;
 use super::token::*;
 use diagnostics::ErrorHandler;
 use filemap::{FileMap, Span, SrcIndex};
@@ -237,7 +246,7 @@ impl<'a> Tokenizer<'a> {
     // =======================================================================
     /// Calls `bump` until the first non-whitespace char or EOF is reached.
     fn skip_whitespace(&mut self) {
-        while self.curr.unwrap_or('x').is_whitespace() {
+        while is_java_whitespace(self.curr.unwrap_or('x')) {
             self.bump();
         }
     }
@@ -268,13 +277,18 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    /// Scans a Java Identifier and returns it as a `String`. Section 3.8.
+    /// Scans a word and returns it as a `String`.
+    ///
+    /// This function scans through the source text as if we expect a Java
+    /// identifier (Section 3.8). However, it might turn out to be a keyword,
+    /// a boolean literal or a null literal.
     ///
     /// ## Preconditions
     /// `curr` needs to be a Java identifier start.
-    fn scan_ident(&mut self) -> String {
+    fn scan_word(&mut self) -> Token {
         // Collect all chars until the first non-ident char or EOF is reached.
-        self.iter().take_while(|&c| is_java_ident_part(c)).collect()
+        Token::Ident(self.iter()
+            .take_while(|&c| is_java_ident_part(c)).collect())
     }
 
     /// Scans a string literal. Not finished yet!
@@ -405,7 +419,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         let t = match self.curr.unwrap() {
-            c if c.is_whitespace() => {
+            c if is_java_whitespace(c) => {
                 self.skip_whitespace();
                 Token::Whitespace
             },
@@ -417,12 +431,12 @@ impl<'a> Iterator for Tokenizer<'a> {
             ',' => { self.bump(); Token::Comma },
             ';' => { self.bump(); Token::Semi },
 
-            '(' => { self.bump(); Token::OpenDelim(DelimToken::Paren) },
-            ')' => { self.bump(); Token::CloseDelim(DelimToken::Paren) },
-            '[' => { self.bump(); Token::OpenDelim(DelimToken::Bracket) },
-            ']' => { self.bump(); Token::CloseDelim(DelimToken::Bracket) },
-            '{' => { self.bump(); Token::OpenDelim(DelimToken::Brace) },
-            '}' => { self.bump(); Token::CloseDelim(DelimToken::Brace) },
+            '(' => { self.bump(); Token::ParenOp },
+            ')' => { self.bump(); Token::ParenCl },
+            '[' => { self.bump(); Token::BracketOp },
+            ']' => { self.bump(); Token::BracketCl },
+            '{' => { self.bump(); Token::BraceOp },
+            '}' => { self.bump(); Token::BraceCl },
 
             '=' if p == '=' => { self.dbump(); Token::EqEq },
             '=' => { self.bump(); Token::Eq },
@@ -475,11 +489,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '0' ... '9' => Token::Literal(self.scan_number_literal()),
 
             'a' ... 'z' | 'A'... 'Z' => {
-                let w = self.scan_ident();
-                match Keyword::from_str(&w) {
-                    Some(kw) => Token::Keyword(kw),
-                    None => Token::Word(w),
-                }
+                self.scan_word()
             },
             _ => {
                 self.fatal_span("Could not lex string");
@@ -565,5 +575,14 @@ fn is_java_ident_part(c: char) -> bool {
             | '\u{300}' ... '\u{374}' => true,
         '\u{37f}' => false,
         _ => c.is_numeric() || is_java_ident_start(c),
+    }
+}
+
+/// Determines if the given character is a whitespace character as defined
+/// in section 3.6
+fn is_java_whitespace(c: char) -> bool {
+    match c {
+        ' ' | '\t' | '\u{000c}' | '\n' | '\r' => true,
+        _ => false,
     }
 }
