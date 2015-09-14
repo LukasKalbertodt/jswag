@@ -293,7 +293,7 @@ impl<'a> Tokenizer<'a> {
             "false" => Token::Literal(Lit::Bool(false)),
             "null" => Token::Literal(Lit::Null),
             _ => match Keyword::from_str(&s) {
-                Ok(k) => Token::Keyword(k),
+                Ok(k) => Token::KeyW(k),
                 Err(_) => Token::Ident(s),
             },
         }
@@ -456,7 +456,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
             },
             '@' => { self.bump(); Token::At },
-            ':' if p == ':' => { self.bump(); Token::ColonSep },
+            ':' if p == ':' => { self.dbump(); Token::ColonSep },
             ':' => { self.bump(); Token::Colon },
 
             // Operators  ==  =  >>>=  >>>  >>=  >>  >=  >  <<=  <<  <=  <
@@ -487,7 +487,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '>' => { self.bump(); Token::Gt },
             '<' if p == '<' => {
                 self.dbump();
-                if self.last == Some('=') {
+                if self.curr == Some('=') {
                     self.bump();
                     Token::ShlEq
                 } else {

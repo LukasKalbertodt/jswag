@@ -113,7 +113,7 @@ pub enum Token {
 
     // Variants of the Java-*Token*
     Ident(String),
-    Keyword(Keyword),
+    KeyW(Keyword),
     Literal(Lit),
 
     // Variants of Java-*Seperator*
@@ -199,7 +199,7 @@ impl Token {
             Comment => "comment",
 
             Ident(_) => "identifier",
-            Keyword(keyword) => keyword.as_java_string(),
+            KeyW(keyword) => keyword.as_java_string(),
             Literal(..) => "Lit(???)",
 
             ParenOp => "(",

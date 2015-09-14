@@ -3,17 +3,11 @@
 ///
 
 use syntax::*;
+use syntax::token::Token::*;
 use filemap::{FileMap, Span};
 use std::rc::Rc;
 use diagnostics::ErrorHandler;
 
-
-fn toks(src: &str) -> Vec<Token> {
-    let fmap = Rc::new(FileMap::new("<unit-test>".into(), src.into()));
-    let error_handler = ErrorHandler::new(fmap.clone());
-    let toks = Tokenizer::new(&fmap, &error_handler);
-    toks.map(|ts| ts.tok).collect()
-}
 
 fn spans(src: &str) -> Vec<TokenSpan> {
     let fmap = Rc::new(FileMap::new("<unit-test>".into(), src.into()));
@@ -21,6 +15,27 @@ fn spans(src: &str) -> Vec<TokenSpan> {
     let toks = Tokenizer::new(&fmap, &error_handler);
     toks.collect()
 }
+
+
+fn toks(src: &str) -> Vec<Token> {
+    spans(src).into_iter().map(|ts| ts.tok).collect()
+}
+
+fn reals(src: &str) -> Vec<Token> {
+    toks(src).into_iter().filter(|t| t.is_real()).collect()
+}
+
+macro_rules! toks {
+    ($s:expr, [$($v:expr),*]) => {
+        assert_eq!(toks($s), vec![$($v)*])
+    }
+}
+macro_rules! reals {
+    ($s:expr, [$($v:expr),*]) => {
+        assert_eq!(reals($s), vec![$($v),*])
+    }
+}
+
 
 #[test]
 fn empty() {
@@ -41,6 +56,32 @@ fn idents() {
     ]);
     assert_eq!(toks("b1la"), vec![Token::Ident("b1la".into())]);
 
+}
+
+#[test]
+fn ops() {
+    // all seperators and operators
+    reals!("(   )   {   }   [   ]   ;   ,   .   ...   @   ::", [
+        ParenOp, ParenCl, BraceOp, BraceCl, BracketOp, BracketCl,
+        Semi, Comma, Dot, DotDotDot, At, ColonSep
+    ]);
+    reals!("=   >   <   !   ~   ?   :   ->", [
+        Eq, Gt, Lt, Bang, Tilde, Question, Colon, Arrow
+    ]);
+    reals!("==  >=  <=  !=  &&  ||  ++  --", [
+        EqEq, Ge, Le, Ne, AndAnd, OrOr, PlusPlus, MinusMinus
+    ]);
+    reals!("+   -   *   /   &   |   ^   %   <<   >>   >>>", [
+        Plus, Minus, Star, Slash, And, Or, Caret, Percent, Shl, Shr, ShrUn
+    ]);
+    reals!("+=  -=  *=  /=  &=  |=  ^=  %=  <<=  >>=  >>>=", [
+        PlusEq, MinusEq, StarEq, SlashEq, AndEq, OrEq, CaretEq, PercentEq,
+        ShlEq, ShrEq, ShrUnEq
+    ]);
+
+    // multi char op stress test
+    reals!(">>>>>>=>> >>=> >=", [ShrUn, ShrUnEq, Shr, ShrEq, Gt, Ge]);
+    reals!("<< <<=< <=", [Shl, ShlEq, Lt, Le]);
 }
 
 #[test]

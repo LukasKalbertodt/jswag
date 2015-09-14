@@ -58,13 +58,13 @@ impl<'a> Parser<'a> {
 
             let curr = try!(self.curr());
             match curr.tok {
-                Token::Keyword(Keyword::Import) => {
+                Token::KeyW(Keyword::Import) => {
                     self.bump();
                     cu.items.push(ast::Item::Import(try!(self.parse_import())));
                 },
                 // TODO: Detecting beginning of class is more complex. It could
                 // start with variouWass keywords and could be an interface.
-                Token::Keyword(Keyword::Public) | Token::Keyword(Keyword::Class) => {
+                Token::KeyW(Keyword::Public) | Token::KeyW(Keyword::Class) => {
                     let boxed = Box::new(try!(self.parse_top_lvl_class()));
                     cu.items.push(ast::Item::Class(boxed));
                 }
@@ -119,7 +119,7 @@ impl<'a> Parser<'a> {
                     // be a next token (program is illformed otherwise).
                     let curr = try!(self.curr());
                     match curr.tok {
-                        $( k @ Token::Keyword(Keyword::$k) => {
+                        $( k @ Token::KeyW(Keyword::$k) => {
                             if mods.insert(ast::Modifier::$k, curr.span).is_some() {
                                 return Err(self.err_dupe(k, curr.span));
                             }
@@ -162,7 +162,7 @@ impl<'a> Parser<'a> {
         }
 
         // `class` is expected now.
-        try!(self.eat(Token::Keyword(Keyword::Class)));
+        try!(self.eat(Token::KeyW(Keyword::Class)));
 
         // `class` was parsed, next token should be class name
         c.name = try!(self.eat_ident());
@@ -280,7 +280,7 @@ impl<'a> Parser<'a> {
                 dims: 0,
                 final_: false,
             };
-            param.final_ = try!(self.eat_maybe(Token::Keyword(Keyword::Final)));
+            param.final_ = try!(self.eat_maybe(Token::KeyW(Keyword::Final)));
             param.ty = try!(self.eat_ident());  // type
             param.dims = try!(self.parse_dims());
             param.name = try!(self.eat_ident());  // name
