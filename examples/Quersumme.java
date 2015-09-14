@@ -32,5 +32,5 @@ public class Quersumme_test {
     IO.println("Die Quersumme ist: " + quersumme);
   }
 
-  public int foo() {}
+  public inti foo() {}
 }

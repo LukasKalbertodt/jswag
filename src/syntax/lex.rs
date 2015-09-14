@@ -427,6 +427,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         let t = match self.curr.unwrap() {
+            // non-real tokens: whitespace and comments
             c if is_java_whitespace(c) => {
                 self.skip_whitespace();
                 Token::Whitespace
@@ -435,72 +436,108 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.skip_comment();
                 Token::Comment
             },
-            '.' => { self.bump(); Token::Dot },
-            ',' => { self.bump(); Token::Comma },
-            ';' => { self.bump(); Token::Semi },
 
+            // Java separators (and `:`)
             '(' => { self.bump(); Token::ParenOp },
             ')' => { self.bump(); Token::ParenCl },
-            '[' => { self.bump(); Token::BracketOp },
-            ']' => { self.bump(); Token::BracketCl },
             '{' => { self.bump(); Token::BraceOp },
             '}' => { self.bump(); Token::BraceCl },
+            '[' => { self.bump(); Token::BracketOp },
+            ']' => { self.bump(); Token::BracketCl },
+            ';' => { self.bump(); Token::Semi },
+            ',' => { self.bump(); Token::Comma },
+            '.' => {
+                self.bump();
+                if p == '.' && self.peek == Some('.') {
+                    self.dbump();
+                    Token::DotDotDot
+                } else {
+                    Token::Dot
+                }
+            },
+            '@' => { self.bump(); Token::At },
+            ':' if p == ':' => { self.bump(); Token::ColonSep },
+            ':' => { self.bump(); Token::Colon },
 
+            // Operators  ==  =  >>>=  >>>  >>=  >>  >=  >  <<=  <<  <=  <
             '=' if p == '=' => { self.dbump(); Token::EqEq },
             '=' => { self.bump(); Token::Eq },
-            '!' if p == '=' => { self.dbump(); Token::Ne },
-            '!' => { self.bump(); Token::Bang },
-            '<' if p == '=' => { self.dbump(); Token::Le },
+            '>' if p == '>' => {
+                self.dbump();
+                match self.curr.unwrap_or('\0') {
+                    '>' => {
+                        self.bump();
+                        if self.curr == Some('=') {
+                            self.bump();
+                            Token::ShrUnEq
+                        } else {
+                            Token::ShrUn
+                        }
+                    },
+                    '=' => {
+                        self.bump();
+                        Token::ShrEq
+                    }
+                    _ =>  {
+                        Token::Shr
+                    }
+                }
+            },
+            '>' if p == '=' => { self.dbump(); Token::Ge },
+            '>' => { self.bump(); Token::Gt },
             '<' if p == '<' => {
                 self.dbump();
-                self.bump();
-                if self.last.unwrap_or('x') == '=' {
+                if self.last == Some('=') {
+                    self.bump();
                     Token::ShlEq
                 } else {
                     Token::Shl
                 }
             },
+            '<' if p == '=' => { self.dbump(); Token::Le },
             '<' => { self.bump(); Token::Lt },
-            '>' if p == '=' => { self.dbump(); Token::Ge },
-            '>' if p == '>' => {
-                self.dbump();
-                self.bump();
-                if self.last.unwrap_or('x') == '=' {
-                    Token::ShrEq
-                } else {
-                    Token::Shr
-                }
-            },
-            '>' => { self.bump(); Token::Gt },
 
+            // Operators  !=  !  ~  ?
+            '!' if p == '=' => { self.dbump(); Token::Ne },
+            '!' => { self.bump(); Token::Bang },
+            '~' => { self.bump(); Token::Tilde },
+            '?' => { self.bump(); Token::Question },
+
+            // Operators  +=  ++  +  -=  ->  --  -  &=  &&  &  |=  ||  |
             '+' if p == '=' => { self.dbump(); Token::PlusEq },
+            '+' if p == '+' => { self.dbump(); Token::PlusPlus },
             '+' => { self.bump(); Token::Plus },
             '-' if p == '=' => { self.dbump(); Token::MinusEq },
+            '-' if p == '>' => { self.dbump(); Token::Arrow },
+            '-' if p == '-' => { self.dbump(); Token::MinusMinus },
             '-' => { self.bump(); Token::Minus },
-            '*' if p == '=' => { self.dbump(); Token::StarEq },
-            '*' => { self.bump(); Token::Star },
-            '/' if p == '=' => { self.dbump(); Token::SlashEq },
-            '/' => { self.bump(); Token::Slash },
-            '%' if p == '=' => { self.dbump(); Token::PercentEq },
-            '%' => { self.bump(); Token::Percent },
-            '^' if p == '=' => { self.dbump(); Token::CaretEq },
-            '^' => { self.bump(); Token::Caret },
             '&' if p == '=' => { self.dbump(); Token::AndEq },
             '&' if p == '&' => { self.dbump(); Token::AndAnd },
             '&' => { self.bump(); Token::And },
             '|' if p == '=' => { self.dbump(); Token::OrEq },
             '|' if p == '|' => { self.dbump(); Token::OrOr },
             '|' => { self.bump(); Token::Or },
-            '~' => { self.bump(); Token::Tilde }
 
+            // Operators  *=  *  /=  /  %=  %  ^=  ^
+            '*' if p == '=' => { self.dbump(); Token::StarEq },
+            '*' => { self.bump(); Token::Star },
+            '/' if p == '=' => { self.dbump(); Token::SlashEq },
+            '/' => { self.bump(); Token::Slash },
+            '^' if p == '=' => { self.dbump(); Token::CaretEq },
+            '^' => { self.bump(); Token::Caret },
+            '%' if p == '=' => { self.dbump(); Token::PercentEq },
+            '%' => { self.bump(); Token::Percent },
+
+            // Literals
             '"' => Token::Literal(Lit::Str(self.scan_string_literal())),
             '0' ... '9' => Token::Literal(self.scan_number_literal()),
 
-            'a' ... 'z' | 'A'... 'Z' => {
+            // identifier, keyword, bool- or null-literal
+            c if is_java_ident_start(c) => {
                 self.scan_word()
             },
             _ => {
-                self.fatal_span("Could not lex string");
+                self.fatal_span("illegal character in this context");
                 return None;
             },
         };
