@@ -5,6 +5,7 @@
 //!
 
 use std::fmt::{Display, Formatter, Error};
+use std::str::FromStr;
 use filemap::Span;
 
 // Macro to generate enums with helper methods
@@ -46,6 +47,30 @@ macro_rules! to_java_string {
             pub fn as_java_string(&self) -> &'static str {
                 match self {
                     $( &$name::$variant => $val ,)*
+                }
+            }
+        }
+    }
+}
+
+macro_rules! display {
+    ($name:ident; $($variant:ident = $val:expr),+) => {
+        impl Display for $name {
+            fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+                self.as_java_string().fmt(f)
+            }
+        }
+    }
+}
+
+macro_rules! from_str {
+    ($name:ident; $($variant:ident = $val:expr),+) => {
+        impl FromStr for $name {
+            type Err = ();
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $($val => Ok($name::$variant), )*
+                    _ => Err(()),
                 }
             }
         }
@@ -241,47 +266,11 @@ impl Display for Token {
     }
 }
 
-
-// Macro to reduce repeated code for keywords.
-macro_rules! declare_keywords {(
-    $( ($name:ident, $word:expr); )*
-) => {
-    #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-    pub enum Keyword {
-        $( $name, )*
-    }
-
-    impl Keyword {
-        /// Returns the java string of the keyword
-        pub fn as_java_string(&self) -> &'static str {
-            match *self {
-                $( Keyword::$name => $word, )*
-            }
-        }
-
-        /// Returns the enum variant corresponding to the given string
-        /// or None if the string does no represent a valid keyword.
-        pub fn from_str(s: &String) -> Option<Self> {
-            match &**s {
-                $( $word => Some(Keyword::$name), )*
-                _ => None,
-            }
-        }
-    }
-
-    impl Display for Keyword {
-        fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-            self.as_java_string().fmt(f)
-        }
-    }
-}}
-
-
-
 gen_enum! {
     #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+    #[allow(unused)]
     pub enum Keyword;
-    with to_java_string for:
+    with to_java_string, display, from_str for:
 
     Abstract = "abstract",
     Assert = "assert",
@@ -339,5 +328,7 @@ gen_enum! {
 pub enum Lit {
     Str(String),
     /// Raw number, long suffix, radix
-    Integer(String, bool, u8)
+    Integer(String, bool, u8),
+    Null,
+    Bool(bool),
 }

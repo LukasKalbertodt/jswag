@@ -12,6 +12,7 @@ use std::iter::Iterator;
 use super::token::*;
 use diagnostics::ErrorHandler;
 use filemap::{FileMap, Span, SrcIndex};
+use std::str::FromStr;
 
 
 /// The Java Tokenizer.
@@ -92,13 +93,6 @@ impl<'a> Tokenizer<'a> {
             self.chs.next()
         };
 
-        // Check if the current char is a line break and add to line break list
-        // Division into lines specified in section 3.4
-        if self.curr == Some('\r')
-            || (self.curr == Some('\n') && self.last != Some('\r')) {
-            self.fmap.add_line(self.curr_pos);
-        }
-
         // update last
         self.last_pos = self.curr_pos;
         self.curr_pos = self.peek_pos;
@@ -109,6 +103,14 @@ impl<'a> Tokenizer<'a> {
                 c.len_utf8()
             };
             self.escaped_peek = 0;
+        }
+
+        // Check if the current char is a line break and add to line break list
+        // Division into lines specified in section 3.4
+        if self.curr == Some('\r')
+            || (self.curr == Some('\n') && self.last != Some('\r')) {
+            // we add the offset of the first char in the new line
+            self.fmap.add_line(self.peek_pos);
         }
 
         // Check for unicode escape. More information in section 3.3
@@ -281,8 +283,20 @@ impl<'a> Tokenizer<'a> {
     /// `curr` needs to be a Java identifier start.
     fn scan_word(&mut self) -> Token {
         // Collect all chars until the first non-ident char or EOF is reached.
-        Token::Ident(self.iter()
-            .take_while(|&c| is_java_ident_part(c)).collect())
+        let s: String = self.iter()
+            .take_while(|&c| is_java_ident_part(c))
+            .collect();
+
+        // check if the word is a keyword
+        match &s[..] {
+            "true" => Token::Literal(Lit::Bool(true)),
+            "false" => Token::Literal(Lit::Bool(false)),
+            "null" => Token::Literal(Lit::Null),
+            _ => match Keyword::from_str(&s) {
+                Ok(k) => Token::Keyword(k),
+                Err(_) => Token::Ident(s),
+            },
+        }
     }
 
     /// Scans a string literal. Not finished yet!

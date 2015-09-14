@@ -9,6 +9,7 @@ use diagnostics::ErrorHandler;
 use std::mem::swap;
 use std::collections::HashMap;
 use std::default::Default;
+use std::fmt::Write;
 
 enum PErr {
     Fatal,
@@ -113,7 +114,7 @@ impl<'a> Parser<'a> {
             // modifier is allowed only once.
             // Stop searching when the first non-modifier token appears.
             macro_rules! check_keywords {
-                ($($k:ident,)*) => {{
+                ($($k:ident),*) => {{
                     // Modifiers are in front of other stuff, so there should
                     // be a next token (program is illformed otherwise).
                     let curr = try!(self.curr());
@@ -129,7 +130,7 @@ impl<'a> Parser<'a> {
             }
 
             check_keywords!(Public, Private, Protected, Abstract, Static,
-                Final, Synchronized, Native, Strictfp, Transient, Volatile,);
+                Final, Synchronized, Native, Strictfp, Transient, Volatile);
 
             // consume token
             self.bump();
@@ -184,7 +185,7 @@ impl<'a> Parser<'a> {
             // Try to parse a member. It starts with modifiers.
             let mmods = try!(self.parse_modifiers());
 
-            // Next up will be a type
+            // Next up will be a type (either a ident or a keyword)
             let ty = try!(self.eat_ident());
 
             // Next up: Method name or first field name
@@ -385,7 +386,8 @@ impl<'a> Parser<'a> {
     }
 
     // fn expect_one_of(&mut self, eat: &[Token]/*, spare: &[Token]*/)
-    //     -> PResult<TokenSpan> {
+    //     -> PResult<TokenSpan>
+    // {
     //     let curr = try!(self.curr());
     //     if eat.contains(&curr.tok) {
     //         self.bump();
@@ -427,18 +429,38 @@ impl<'a> Parser<'a> {
     }
 
     fn err_unexpected(&self, expected: &[Token], found: Token) -> PErr {
-        let list = expected.iter().enumerate().fold(String::new(), |mut list, (idx, ref t)| {
-            list.push_str(&*format!("`{}`", t));
-            if idx + 2 < expected.len() {
-                list.push_str(", ");
-            } else if idx + 2 == expected.len() {
-                list.push_str(" or ");
-            }
-            list
-        });
 
-        self.e.span_err(self.curr.clone().unwrap().span,
-            format!("Unexpected token: Expected {}, found `{}`", list, found));
+        let mut list = String::new();
+        for (i, t) in expected.iter().enumerate() {
+            let sep = if i + 1 == expected.len() {
+                ""
+            } else if i + 2 == expected.len() {
+                " or "
+            } else {
+                ", "
+            };
+
+            let _ = match t {
+                &Token::Ident(_) | &Token::Literal(_)
+                    => write!(list, "{}{}", t, sep),
+                _ => write!(list, "`{}`{}", t, sep),
+            };
+        }
+        // expected.iter().map(|mut list, (idx, ref t)| {
+        //     list.push_str(&*format!("`{}`", t));
+        //     if idx + 2 < expected.len() {
+        //         list.push_str(", ");
+        //     } else if idx + 2 == expected.len() {
+        //         list.push_str(" or ");
+        //     }
+        //     list
+        // });
+
+        let msg = format!(
+            "Unexpected token: Expected {}{}, found `{}`",
+            if expected.len() > 1 { "one of" } else { "" },
+            list, found);
+        self.e.span_err(self.curr.clone().unwrap().span, msg);
         PErr::Fatal
     }
 }

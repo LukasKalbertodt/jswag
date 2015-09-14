@@ -78,8 +78,7 @@ impl FileMap {
     pub fn get_line(&self, index: LineIdx) -> String {
         // TODO: Maybe safety checks
         let offset = self.lines.borrow()[index];
-        let end = self.src[offset .. self.src.len()]
-            .find("\n").unwrap_or(self.src.len());
+        let end = self.src[offset..].find("\n").unwrap_or(self.src.len());
         self.src[offset .. (end + offset)].to_string()
     }
 }

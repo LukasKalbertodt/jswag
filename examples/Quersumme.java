@@ -8,9 +8,9 @@ import AlgoTools.*;
  */
 
 public class Quersumme_test {
-  public static float pi = 3.1415926;
+  public static floati pi = 3.1415926;
 
-  public static void main(String[] args) {
+  public static voidi main(String[] args) {
     int zahl;
 
     do {
