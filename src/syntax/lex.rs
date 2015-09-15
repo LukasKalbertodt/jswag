@@ -334,7 +334,7 @@ impl<'a> Tokenizer<'a> {
     /// Parsing of floating point literals is not ready yet!
     ///
     /// ## Preconditions
-    /// `curr` needs to be in '0' ... '9'.
+    /// `curr` needs to be in '0' ... '9' or a '.' followed by '0' ... '9'
     fn scan_number_literal(&mut self) -> Lit {
         let (r, s) = match self.curr {
             // if literal is starting with '0' (-> not decimal or single digit)
@@ -362,21 +362,120 @@ impl<'a> Tokenizer<'a> {
                     }
                 }
             },
+            // literal starting with a dot: decimal float. Note: No bump
+            Some('.') => (10, "".into()),
             // literal starting with non-null digit (-> decimal)
             _ => (10, self.scan_digits(10))
         };
 
-        // peek at the first char after the number for suffix detection
-        let mut long_suffix = false;
-        match self.curr.unwrap_or('0') {
+        // look at the first char after the whole number part
+        match self.curr.unwrap_or('\0') {
             'l' | 'L' => {
                 self.bump();
-                long_suffix = true;
+                Lit::Integer { raw: s, is_long: true, radix: r as u8 }
             },
-            _ => {},
-        }
+            // After a whole number part may follow a float type suffix
+            c @ 'f' | c @ 'F' | c @ 'd' | c @ 'D' if !s.is_empty() => {
+                self.bump();
+                Lit::Float {
+                    raw: s,
+                    is_double: (c != 'f' && c != 'F'),
+                    radix: r as u8,
+                    exp: "".into(),
+                }
+            },
+            // If we have a whole number part, there may follow a exponent part
+            'p' | 'P' | 'e' | 'E' if !s.is_empty() => {
+                match self.scan_float_exp(r == 16) {
+                    // Failing to scan the exponent means that the exponent
+                    // char is wrong (p for hex, e for decimal)
+                    None => {
+                        if r == 16 {
+                            self.fatal_span("invalid exponent indicator for \
+                                hex float literal (use 'p' or 'P' instead");
+                        } else {
+                            self.fatal_span("invalid exponent indicator for \
+                                decimal float literal (use 'f' or 'F' instead");
+                        }
+                        Lit::Integer {
+                            raw: s, is_long: false, radix: r as u8
+                        }
+                    },
+                    Some(ex) => {
+                        // A float type suffix may follow
+                        let double = match self.curr.unwrap_or('\0') {
+                            'f' | 'F' => { self.bump(); false },
+                            'p' | 'P' => { self.bump(); true },
+                            _ => true,
+                        };
 
-        Lit::Integer(s, long_suffix, r as u8)
+                        Lit::Float {
+                            raw: s,
+                            is_double: double,
+                            radix: r as u8,
+                            exp: ex,
+                        }
+                    }
+                }
+            }
+
+            // A dot means float literal and may occur in two situations:
+            // - we already read a whole number part
+            // - the dot was the start of the literal
+            '.' => {
+                // make sure the literal is in the right base
+                if r != 10 && r != 16 {
+                    self.fatal_span(&format!("float literals may only be \
+                        expressed in decimal or hexadecimal, not base {}", r));
+                    return Lit::Integer {
+                        raw: s, is_long: false, radix: r as u8
+                    };
+                }
+                self.bump();    // dot
+
+                // We do not know if there was a whole number part of the float
+                // already, but we don't need to: If there is none, the literal
+                // started with a dot. The precondition says that this dot
+                // is followed by a digit from 0 to 9. So `fraction` will be
+                // non-empty if a fraction part is required.
+                let fraction = self.scan_digits(r);
+
+                // At this point we either have a decimal or hexadecimal
+                // whole number part and a dot. Exponent and suffix are
+                // optional (-> `unwrap_or` is ok)
+                let exp = self.scan_float_exp(r == 16).unwrap_or("".into());
+                let is_double = self.scan_double_suffix().unwrap_or(true);
+
+                Lit::Float {
+                    raw: format!("{}.{}", s, fraction),
+                    is_double: is_double,
+                    radix: r as u8,
+                    exp: exp,
+                }
+            },
+            _ => Lit::Integer { raw: s, is_long: false, radix: r as u8 },
+        }
+    }
+
+    /// Scans a float suffix ('d' or 'f') if present and returns if the
+    /// suffix was a 'd' (double) suffix.
+    fn scan_double_suffix(&mut self) -> Option<bool> {
+        match self.curr.unwrap_or('\0') {
+            'd' | 'D' => { self.bump(); Some(true) },
+            'f' | 'F' => { self.bump(); Some(false) },
+            _ => None
+        }
+    }
+
+    /// Scans a float exponent
+    fn scan_float_exp(&mut self, hex: bool) -> Option<String> {
+        match (hex, self.curr.unwrap_or('\0')) {
+            (false, 'e') | (false, 'E') | (true, 'p') | (true, 'P') => {
+                self.bump();
+                Some(self.scan_digits(10))
+            },
+            _ => None,
+        }
     }
 
     /// Scans digits with the given radix and returns the scanned string.
@@ -391,7 +490,7 @@ impl<'a> Tokenizer<'a> {
 
         let mut s = String::new();
         loop {
-            match self.curr.unwrap_or('*') {
+            match self.curr.unwrap_or('\0') {
                 // skip underscores
                 '_' => {
                     self.bump();
@@ -437,7 +536,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 Token::Comment
             },
 
-            // Java separators (and `:`)
+            // Java separators, ':' and float literals
             '(' => { self.bump(); Token::ParenOp },
             ')' => { self.bump(); Token::ParenCl },
             '{' => { self.bump(); Token::BraceOp },
@@ -447,12 +546,17 @@ impl<'a> Iterator for Tokenizer<'a> {
             ';' => { self.bump(); Token::Semi },
             ',' => { self.bump(); Token::Comma },
             '.' => {
-                self.bump();
-                if p == '.' && self.peek == Some('.') {
-                    self.dbump();
-                    Token::DotDotDot
-                } else {
-                    Token::Dot
+                match p {
+                    '0' ... '9' => Token::Literal(self.scan_number_literal()),
+                    _ => {
+                        self.bump();
+                        if p == '.' && self.peek == Some('.') {
+                            self.dbump();
+                            Token::DotDotDot
+                        } else {
+                            Token::Dot
+                        }
+                    }
                 }
             },
             '@' => { self.bump(); Token::At },

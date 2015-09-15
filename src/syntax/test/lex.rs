@@ -51,7 +51,7 @@ fn idents() {
         Ident("bar".into())
     ]);
     toks!("1bla", [
-        Literal(Lit::Integer("1".into(), false, 10)),
+        Literal(Lit::Integer { raw: "1".into(), is_long: false, radix: 10 }),
         Ident("bla".into())
     ]);
     toks!("b1la", [Ident("b1la".into())]);
@@ -95,26 +95,134 @@ fn easy_literals() {
 #[test]
 fn int_literals() {
     assert_eq!(toks("123"), vec![
-        Literal(Lit::Integer("123".into(), false, 10))
+        Literal(Lit::Integer { raw: "123".into(), is_long: false, radix: 10 })
     ]);
     assert_eq!(toks("123l"), vec![
-        Literal(Lit::Integer("123".into(), true, 10))
+        Literal(Lit::Integer { raw: "123".into(), is_long: true, radix: 10 })
     ]);
     assert_eq!(toks("0123"), vec![
-        Literal(Lit::Integer("123".into(), false, 8))
+        Literal(Lit::Integer { raw: "123".into(), is_long: false, radix: 8 })
     ]);
     assert_eq!(toks("0x1fa3l"), vec![
-        Literal(Lit::Integer("1fa3".into(), true, 16))
+        Literal(Lit::Integer { raw: "1fa3".into(), is_long: true, radix: 16 })
     ]);
     assert_eq!(toks("0x1f"), vec![
-        Literal(Lit::Integer("1f".into(), false, 16))
+        Literal(Lit::Integer { raw: "1f".into(), is_long: false, radix: 16 })
     ]);
     assert_eq!(toks("0b101l"), vec![
-        Literal(Lit::Integer("101".into(), true, 2))
+        Literal(Lit::Integer { raw: "101".into(), is_long: true, radix: 2 })
     ]);
     assert_eq!(toks("0l"), vec![
-        Literal(Lit::Integer("0".into(), true, 10))
+        Literal(Lit::Integer { raw: "0".into(), is_long: true, radix: 10 })
     ]);
+}
+
+#[test]
+fn float_literals() {
+    // type 1:  Digits . [Digits] [ExponentPart] [FloatTypeSuffix]
+    toks!("3.", [Literal(Lit::Float {   // digit dot
+        raw: "3.".into(),
+        is_double: true,
+        radix: 10,
+        exp: "".into()
+    })]);
+    toks!("3.14", [Literal(Lit::Float { // digit dot digit
+        raw: "3.14".into(),
+        is_double: true,
+        radix: 10,
+        exp: "".into()
+    })]);
+    toks!("3.e2", [Literal(Lit::Float { // digit dot exp
+        raw: "3.".into(),
+        is_double: true,
+        radix: 10,
+        exp: "2".into()
+    })]);
+    toks!("3.f", [Literal(Lit::Float {  // digit dot suffix
+        raw: "3.".into(),
+        is_double: false,
+        radix: 10,
+        exp: "".into()
+    })]);
+    toks!("3.14e3", [Literal(Lit::Float {   // digit dot digit exp
+        raw: "3.14".into(),
+        is_double: true,
+        radix: 10,
+        exp: "3".into()
+    })]);
+    toks!("3.14f", [Literal(Lit::Float {    // digit dot digit suffix
+        raw: "3.14".into(),
+        is_double: false,
+        radix: 10,
+        exp: "".into()
+    })]);
+    toks!("3.e3f", [Literal(Lit::Float {    // digit dot exp suffix
+        raw: "3.".into(),
+        is_double: false,
+        radix: 10,
+        exp: "3".into()
+    })]);
+    toks!("3.14e3f", [Literal(Lit::Float {  // digit dot digit exp suffix
+        raw: "3.14".into(),
+        is_double: false,
+        radix: 10,
+        exp: "3".into()
+    })]);
+
+    // type 2: . Digits [ExponentPart] [FloatTypeSuffix]
+    toks!(".14", [Literal(Lit::Float {
+        raw: ".14".into(),
+        is_double: true,
+        radix: 10,
+        exp: "".into()
+    })]);
+    toks!(".14e3", [Literal(Lit::Float {
+        raw: ".14".into(),
+        is_double: true,
+        radix: 10,
+        exp: "3".into()
+    })]);
+    toks!(".14f", [Literal(Lit::Float {
+        raw: ".14".into(),
+        is_double: false,
+        radix: 10,
+        exp: "".into()
+    })]);
+    toks!(".14e3f", [Literal(Lit::Float {
+        raw: ".14".into(),
+        is_double: false,
+        radix: 10,
+        exp: "3".into()
+    })]);
+
+    // type 3:  Digits ExponentPart [FloatTypeSuffix]
+    // type 4: Digits [ExponentPart] FloatTypeSuffix
+    toks!("3e3", [Literal(Lit::Float {
+        raw: "3".into(),
+        is_double: true,
+        radix: 10,
+        exp: "3".into()
+    })]);
+    toks!("3f", [Literal(Lit::Float {
+        raw: "3".into(),
+        is_double: false,
+        radix: 10,
+        exp: "".into()
+    })]);
+    toks!("3e3f", [Literal(Lit::Float {
+        raw: "3".into(),
+        is_double: false,
+        radix: 10,
+        exp: "3".into()
+    })]);
+
+
+    // toks!("0x3.14p4f", [Literal(Lit::Float {
+    //     raw: "3.14".into(),
+    //     is_double: false,
+    //     radix: 16,
+    //     exp: "4".into()
+    // })]);
 }
 
 #[test]
