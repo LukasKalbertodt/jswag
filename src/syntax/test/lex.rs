@@ -144,11 +144,11 @@ fn float_literals() {
         radix: 10,
         exp: "".into()
     })]);
-    toks!("3.14e3", [Literal(Lit::Float {   // digit dot digit exp
+    toks!("3.14e-3", [Literal(Lit::Float {   // digit dot digit exp
         raw: "3.14".into(),
         is_double: true,
         radix: 10,
-        exp: "3".into()
+        exp: "-3".into()
     })]);
     toks!("3.14f", [Literal(Lit::Float {    // digit dot digit suffix
         raw: "3.14".into(),
@@ -162,11 +162,11 @@ fn float_literals() {
         radix: 10,
         exp: "3".into()
     })]);
-    toks!("3.14e3f", [Literal(Lit::Float {  // digit dot digit exp suffix
+    toks!("3.14e-3f", [Literal(Lit::Float {  // digit dot digit exp suffix
         raw: "3.14".into(),
         is_double: false,
         radix: 10,
-        exp: "3".into()
+        exp: "-3".into()
     })]);
 
     // type 2: . Digits [ExponentPart] [FloatTypeSuffix]
@@ -176,11 +176,11 @@ fn float_literals() {
         radix: 10,
         exp: "".into()
     })]);
-    toks!(".14e3", [Literal(Lit::Float {
+    toks!(".14e-3", [Literal(Lit::Float {
         raw: ".14".into(),
         is_double: true,
         radix: 10,
-        exp: "3".into()
+        exp: "-3".into()
     })]);
     toks!(".14f", [Literal(Lit::Float {
         raw: ".14".into(),
@@ -197,11 +197,11 @@ fn float_literals() {
 
     // type 3:  Digits ExponentPart [FloatTypeSuffix]
     // type 4: Digits [ExponentPart] FloatTypeSuffix
-    toks!("3e3", [Literal(Lit::Float {
+    toks!("3e-3", [Literal(Lit::Float {
         raw: "3".into(),
         is_double: true,
         radix: 10,
-        exp: "3".into()
+        exp: "-3".into()
     })]);
     toks!("3f", [Literal(Lit::Float {
         raw: "3".into(),

@@ -472,7 +472,13 @@ impl<'a> Tokenizer<'a> {
         match (hex, self.curr.unwrap_or('\0')) {
             (false, 'e') | (false, 'E') | (true, 'p') | (true, 'P') => {
                 self.bump();
-                Some(self.scan_digits(10))
+                let minus = if self.curr == Some('-') {
+                    self.bump();
+                    "-"
+                } else {
+                    ""
+                };
+                Some(format!("{}{}", minus, self.scan_digits(10)))
             },
             _ => None,
         }
