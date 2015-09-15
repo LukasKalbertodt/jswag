@@ -407,11 +407,7 @@ impl<'a> Tokenizer<'a> {
                     },
                     Some(ex) => {
                         // A float type suffix may follow
-                        let double = match self.curr.unwrap_or('\0') {
-                            'f' | 'F' => { self.bump(); false },
-                            'p' | 'P' => { self.bump(); true },
-                            _ => true,
-                        };
+                        let double = self.scan_double_suffix().unwrap_or(true);
 
                         Lit::Float {
                             raw: s,
@@ -437,49 +433,33 @@ impl<'a> Tokenizer<'a> {
                 }
                 self.bump();    // dot
 
-                if r == 16 {
-                    let fraction = self.scan_digits(16);
-                    // print error if there is neither a whole number nor a
-                    // fraction part
-                    if s.is_empty() && fraction.is_empty() {
-                        self.fatal_span("hex float literals need either a \
-                            whole number or a fraction part");
-                    }
+                // We do not need to check if both, the whole number and
+                // fraction part, are empty in decimal case for the
+                // following reason:
+                // The precondition tells us that this function is only
+                // called if `curr` is a number OR a dot followed by a
+                // number. This guarantees that at least one part is
+                // non-empty in decimal case.
+                let fraction = self.scan_digits(r);
+                if r == 16 && s.is_empty() && fraction.is_empty() {
+                    self.fatal_span("hex float literals need either a \
+                        whole number or a fraction part");
+                }
 
-                    let ex = self.scan_float_exp(true).unwrap_or("".into());
-                    if ex.is_empty() {
-                        self.fatal_span("hex float literals need an exponent");
-                    }
+                // In a hexadecimal float literal the exponent is required
+                let exp = self.scan_float_exp(r == 16).unwrap_or("".into());
+                if r == 16 && exp.is_empty() {
+                    self.fatal_span("hex float literals are required to \
+                        have an exponent");
+                }
 
-                    // optional type suffix
-                    let is_double = self.scan_double_suffix().unwrap_or(true);
-
-                    Lit::Float {
-                        raw: format!("{}.{}", s, fraction),
-                        is_double: is_double,
-                        radix: 16,
-                        exp: ex,
-                    }
-                } else {
-                    // We do not know if there was a whole number part of the float
-                    // already, but we don't need to: If there is none, the literal
-                    // started with a dot. The precondition says that this dot
-                    // is followed by a digit from 0 to 9. So `fraction` will be
-                    // non-empty if a fraction part is required.
-                    let fraction = self.scan_digits(r);
-
-                    // At this point we either have a decimal or hexadecimal
-                    // whole number part and a dot. Exponent and suffix are
-                    // optional (-> `unwrap_or` is ok)
-                    let exp = self.scan_float_exp(false).unwrap_or("".into());
-                    let is_double = self.scan_double_suffix().unwrap_or(true);
-
-                    Lit::Float {
-                        raw: format!("{}.{}", s, fraction),
-                        is_double: is_double,
-                        radix: r as u8,
-                        exp: exp,
-                    }
+                // type suffix is always optional
+                let is_double = self.scan_double_suffix().unwrap_or(true);
+                Lit::Float {
+                    raw: format!("{}.{}", s, fraction),
+                    is_double: is_double,
+                    radix: r as u8,
+                    exp: exp,
                 }
             },
             _ => Lit::Integer { raw: s, is_long: false, radix: r as u8 },
