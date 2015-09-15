@@ -217,12 +217,58 @@ fn float_literals() {
     })]);
 
 
-    // toks!("0x3.14p4f", [Literal(Lit::Float {
-    //     raw: "3.14".into(),
-    //     is_double: false,
-    //     radix: 16,
-    //     exp: "4".into()
-    // })]);
+    // floating point literals
+    toks!("0x3p4", [Literal(Lit::Float {
+        raw: "3".into(),
+        is_double: true,
+        radix: 16,
+        exp: "4".into()
+    })]);
+    toks!("0x3p4_4f", [Literal(Lit::Float {
+        raw: "3".into(),
+        is_double: false,
+        radix: 16,
+        exp: "44".into()
+    })]);
+
+    toks!("0x3.p4", [Literal(Lit::Float {
+        raw: "3.".into(),
+        is_double: true,
+        radix: 16,
+        exp: "4".into()
+    })]);
+    toks!("0x378.p4f", [Literal(Lit::Float {
+        raw: "378.".into(),
+        is_double: false,
+        radix: 16,
+        exp: "4".into()
+    })]);
+
+    toks!("0x3.1_55p43", [Literal(Lit::Float {
+        raw: "3.155".into(),
+        is_double: true,
+        radix: 16,
+        exp: "43".into()
+    })]);
+    toks!("0x3.1p4f", [Literal(Lit::Float {
+        raw: "3.1".into(),
+        is_double: false,
+        radix: 16,
+        exp: "4".into()
+    })]);
+
+    toks!("0x.11p4", [Literal(Lit::Float {
+        raw: ".11".into(),
+        is_double: true,
+        radix: 16,
+        exp: "4".into()
+    })]);
+    toks!("0x.1p44f", [Literal(Lit::Float {
+        raw: ".1".into(),
+        is_double: false,
+        radix: 16,
+        exp: "44".into()
+    })]);
 }
 
 #[test]

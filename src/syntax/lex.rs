@@ -343,7 +343,11 @@ impl<'a> Tokenizer<'a> {
                     // hexadecimal literal
                     'x' | 'X' => {
                         self.dbump();   // skip "0x"
-                        (16, self.scan_digits(16))
+                        (16, if self.curr != Some('.') {
+                            self.scan_digits(16)
+                        } else {
+                            "".into()
+                        })
                     },
                     // binary literal
                     'b' | 'B' => {
@@ -433,24 +437,49 @@ impl<'a> Tokenizer<'a> {
                 }
                 self.bump();    // dot
 
-                // We do not know if there was a whole number part of the float
-                // already, but we don't need to: If there is none, the literal
-                // started with a dot. The precondition says that this dot
-                // is followed by a digit from 0 to 9. So `fraction` will be
-                // non-empty if a fraction part is required.
-                let fraction = self.scan_digits(r);
+                if r == 16 {
+                    let fraction = self.scan_digits(16);
+                    // print error if there is neither a whole number nor a
+                    // fraction part
+                    if s.is_empty() && fraction.is_empty() {
+                        self.fatal_span("hex float literals need either a \
+                            whole number or a fraction part");
+                    }
 
-                // At this point we either have a decimal or hexadecimal
-                // whole number part and a dot. Exponent and suffix are
-                // optional (-> `unwrap_or` is ok)
-                let exp = self.scan_float_exp(r == 16).unwrap_or("".into());
-                let is_double = self.scan_double_suffix().unwrap_or(true);
+                    let ex = self.scan_float_exp(true).unwrap_or("".into());
+                    if ex.is_empty() {
+                        self.fatal_span("hex float literals need an exponent");
+                    }
 
-                Lit::Float {
-                    raw: format!("{}.{}", s, fraction),
-                    is_double: is_double,
-                    radix: r as u8,
-                    exp: exp,
+                    // optional type suffix
+                    let is_double = self.scan_double_suffix().unwrap_or(true);
+
+                    Lit::Float {
+                        raw: format!("{}.{}", s, fraction),
+                        is_double: is_double,
+                        radix: 16,
+                        exp: ex,
+                    }
+                } else {
+                    // We do not know if there was a whole number part of the float
+                    // already, but we don't need to: If there is none, the literal
+                    // started with a dot. The precondition says that this dot
+                    // is followed by a digit from 0 to 9. So `fraction` will be
+                    // non-empty if a fraction part is required.
+                    let fraction = self.scan_digits(r);
+
+                    // At this point we either have a decimal or hexadecimal
+                    // whole number part and a dot. Exponent and suffix are
+                    // optional (-> `unwrap_or` is ok)
+                    let exp = self.scan_float_exp(false).unwrap_or("".into());
+                    let is_double = self.scan_double_suffix().unwrap_or(true);
+
+                    Lit::Float {
+                        raw: format!("{}.{}", s, fraction),
+                        is_double: is_double,
+                        radix: r as u8,
+                        exp: exp,
+                    }
                 }
             },
             _ => Lit::Integer { raw: s, is_long: false, radix: r as u8 },
