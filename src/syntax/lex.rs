@@ -299,28 +299,61 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    /// Scans a string literal. Not finished yet!
+    /// Reads a char inside a string or character literal. If `curr` is a
+    /// backslash, the escape character is parsed, if possible.
+    ///
+    /// Returns `None` if
+    /// - `curr` is `None` (EOF),
+    /// - `curr` is the given separator `sep` (either `"` or `'`)
+    /// - an invalid escape sequence was found
+    fn scan_string_char(&mut self, sep: char) -> Option<char> {
+        match self.curr {
+            Some('\\') => {
+                self.bump();
+                match self.curr {
+                    None => None, // error, but it's handled somewhere else
+                    Some('b') => { self.bump(); Some('\u{0008}') },
+                    Some('t') => { self.bump(); Some('\t') },
+                    Some('n') => { self.bump(); Some('\n') },
+                    Some('f') => { self.bump(); Some('\u{000c}') },
+                    Some('r') => { self.bump(); Some('\r') },
+                    Some('\'') => { self.bump(); Some('\'') },
+                    Some('\"') => { self.bump(); Some('\"') },
+                    Some('\\') => { self.bump(); Some('\\') },
+                    Some(c) => {
+                        self.fatal_span(&format!("invalid escape sequence \
+                            \\{}", c));
+                        None
+                    }
+                }
+            }
+            Some(c) if c == sep => None,
+            Some(c) => {
+                self.bump();
+                Some(c)
+            },
+            None => None,
+        }
+    }
+
+    /// Scans a Java string literal.
+    ///
+    /// ## Preconditions
+    /// `curr` needs to be '"'
     fn scan_string_literal(&mut self) -> String {
-        // TODO: Escape shit
-        // `curr` is '"'. Note: After one bump, `last` != None
-        self.bump();
+        self.bump();    // discard '"'
 
         let mut s = String::new();
-        loop {
-            match self.curr {
-                Some(c) if c == '"' && self.last.unwrap() != '\\' => break,
-                None => {
-                    self.fatal_span("Unexpected EOF while lexing \
-                        string literal");
-                    break;
-                },
-                Some(c) => {
-                    s.push(c);
-                    self.bump();
-                },
-            }
+        while let Some(c) = self.scan_string_char('\"') {
+            s.push(c);
         }
-        self.bump();    // Remove last '"'
+
+        // check if the loop stopped due to a (proper) '"'
+        if self.curr == Some('\"') {
+            self.bump();
+        } else {
+            self.fatal_span("unexpected EOF in string literal");
+        }
         s
     }
 

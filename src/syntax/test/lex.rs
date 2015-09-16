@@ -272,6 +272,16 @@ fn float_literals() {
 }
 
 #[test]
+fn string_literals() {
+    toks!(r#""hi""#, [Literal(Lit::Str("hi".into()))]);
+    toks!(r#""hi \" bla""#, [Literal(Lit::Str("hi \" bla".into()))]);
+    toks!(r#""\b \t \n \f \r \" \' \\""#, [Literal(Lit::Str(
+        "\u{0008} \t \n \u{000c} \r \" \' \\".into()
+    ))]);
+    toks!(r#""\nn""#, [Literal(Lit::Str("\nn".into()))]);
+}
+
+#[test]
 fn unicode_escapes() {
     // correct
     assert_eq!(spans(r"z\u0078z"), vec![
