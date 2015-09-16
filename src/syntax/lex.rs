@@ -3,8 +3,8 @@
 //! The main type is the Tokenizer that will take the Java source code and
 //! produces a sequence of tokens out of it.
 //!
-//! Most details of this module are defined in section 3 (lexical structure) of
-//! the Java language specification.
+//! Most details of this module are specified in section 3 (lexical structure)
+//! of the Java language specification.
 //!
 //! In some places (like octal escapes or float literals) it would have been
 //! much easier to use a regex for lexing. However, to avoid the dependency
@@ -20,12 +20,12 @@
 //! tokenizer to report all lexing errors.
 //!
 
-use std::str::Chars;
-use std::iter::Iterator;
-use super::token::*;
 use diagnostics::ErrorHandler;
 use filemap::{FileMap, Span, SrcIndex};
+use std::iter::Iterator;
+use std::str::Chars;
 use std::str::FromStr;
+use super::token::*;
 
 
 /// The Java Tokenizer.
@@ -57,7 +57,9 @@ pub struct Tokenizer<'a> {
     /// Byte offset when parsing the current token started
     token_start: SrcIndex,
 
-    /// Used for translation of unicode escapes. Do not use directly
+    /// Used for translation of unicode escapes. Do not use directly!
+    /// Note: It may be easier to use a `Peek` iterator to avoid manual peek
+    /// handling. However, it's already written and works... whatever
     upeek: Option<char>,
     escaped_peek: u8,
 }
@@ -95,10 +97,14 @@ impl<'a> Tokenizer<'a> {
     // =======================================================================
     // Private helper methods
     // =======================================================================
-    /// Reads a new char from the iterator, updating last, curr and peek + pos
+    /// Reads a new char from the iterator, updating last, curr and peek + pos.
+    /// Also handles line breaks and unicode escapes.
     fn bump(&mut self) {
         self.last = self.curr;
         self.curr = self.peek;
+
+        // If we already peeked once more to handle unicode escapes, use that
+        // value instead of calling `next` already.
         self.peek = if let Some(un) = self.upeek {
             self.upeek = None;
             Some(un)
@@ -106,10 +112,12 @@ impl<'a> Tokenizer<'a> {
             self.chs.next()
         };
 
-        // update last
+        // update byte offsets
         self.last_pos = self.curr_pos;
         self.curr_pos = self.peek_pos;
         if let Some(c) = self.curr {
+            // if peek was created from a unicode escape sequence, we add the
+            // escape byte offset instead of the utf8 len
             self.peek_pos += if self.escaped_peek > 0 {
                 self.escaped_peek as usize
             } else {
@@ -127,6 +135,7 @@ impl<'a> Tokenizer<'a> {
         }
 
         // Check for unicode escape. More information in section 3.3
+        // Warning: Crazy code ahead
         if self.peek == Some('\\') && self.curr != Some('\\') {
             self.upeek = self.chs.next();
             if self.upeek == Some('u') {
@@ -134,6 +143,7 @@ impl<'a> Tokenizer<'a> {
                 // char after '\' is not 'u'. So we reset it here.
                 self.upeek = None;
 
+                // we already read \ and u
                 let mut pos_offset = 2;
 
                 // We use a temporary peekable iterator here to check for
@@ -177,7 +187,7 @@ impl<'a> Tokenizer<'a> {
                         },
                         "Invalid unicode escape (less than 4 digits)".into()
                     );
-                    // ... but ignore the wrong unicode escape.
+                    // ... but ignore the wrong unicode escape (POISON).
                     // If we couldn't read 4 digits because we reached EOF,
                     // interrupt will be None. If the reason was a non-hex
                     // char, it's saved in interrupt.
@@ -186,7 +196,7 @@ impl<'a> Tokenizer<'a> {
                     // update position accordingly
                     self.peek_pos += pos_offset + num_digits;
                 } else {
-                    // we read all 4 digits and converted them to int. Now use
+                    // We read all 4 digits and converted them to int. Now use
                     // that value to create a new char and save it into peek.
                     self.peek = match ::std::char::from_u32(value) {
                         Some(c) => {
@@ -221,13 +231,9 @@ impl<'a> Tokenizer<'a> {
                 self.peek = None
             }
         }
-
-        // println!("AFTER: {:?} {:?} {:?} || {} {}",
-        //     self.last, self.curr, self.peek,
-        //     self.curr_pos, self.peek_pos);
     }
 
-    /// Calls `bump` twice. For less typing.
+    /// Calls `bump` twice. Being lazy sometimes...
     fn dbump(&mut self) {
         self.bump();
         self.bump();
@@ -235,11 +241,13 @@ impl<'a> Tokenizer<'a> {
 
     /// Convenience function to return a char iterator over `curr`. See
     /// `CharIter` for more info.
+    /// TODO: This function is only used once... so we might remove it.
     fn iter<'b>(&'b mut self) -> CharIter<'b, 'a> {
         CharIter::new(self)
     }
 
-    /// Prints a fatal error message through error diagnostic
+    /// Prints a fatal error message through error diagnostic using the
+    /// span (token_start, peek_pos)
     fn fatal_span(&mut self, m: &str) {
         self.diag.span_err(
             Span {
@@ -261,7 +269,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Skips `/* */` and `//` comments. Calls `bump` until the first char
-    /// after the comment is reached.
+    /// after the comment is reached. Section 3.7
     ///
     /// ## Preconditions
     /// `curr` needs to be '/' and `peek` needs to be one of '*' and '/'
