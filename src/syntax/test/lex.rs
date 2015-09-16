@@ -282,6 +282,9 @@ fn string_literals() {
     reals!(r#""a" "b""#, [
         Literal(Lit::Str("a".into())), Literal(Lit::Str("b".into()))
     ]);
+    toks!(r#""\0 \00 \000 \0000 \377 \118 \42 \400""#, [Literal(Lit::Str(
+        "\x00 \x00 \x00 \x000 \u{ff} \u{9}8 \u{22} \u{20}0".into()
+    ))]);
 
     toks!(r"'a'", [Literal(Lit::Char('a'))]);
     reals!(r#"'\b' '\t' '\n' '\f' '\r' '\"' '\'' '\\'"#, [

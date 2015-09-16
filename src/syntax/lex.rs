@@ -6,6 +6,19 @@
 //! Most details of this module are defined in section 3 (lexical structure) of
 //! the Java language specification.
 //!
+//! In some places (like octal escapes or float literals) it would have been
+//! much easier to use a regex for lexing. However, to avoid the dependency
+//! to a rather big crate, the functionality was programmed by hand. Using a
+//! regex in the environment of the tokenizer would have been difficult anyway,
+//! since it's using `bump()` to read new chars.
+//!
+//! If the tokenizer runs into a lexing error, it will print a message, but
+//! continue to work like before. This implies that the tokenizer may produce
+//! some so called poisoned tokens -- tokens that contain some kind of default
+//! or artificial value. Any lexing error is recovered as best as it's
+//! possible. This behaviour enables the parser to operate normally and the
+//! tokenizer to report all lexing errors.
+//!
 
 use std::str::Chars;
 use std::iter::Iterator;
@@ -313,23 +326,30 @@ impl<'a> Tokenizer<'a> {
         match self.curr {
             Some('\\') => {
                 self.bump();
-                (match self.curr {
-                    None => None, // error, but it's handled somewhere else
-                    Some('b') => { self.bump(); Some('\u{0008}') },
-                    Some('t') => { self.bump(); Some('\t') },
-                    Some('n') => { self.bump(); Some('\n') },
-                    Some('f') => { self.bump(); Some('\u{000c}') },
-                    Some('r') => { self.bump(); Some('\r') },
-                    Some('\'') => { self.bump(); Some('\'') },
-                    Some('\"') => { self.bump(); Some('\"') },
-                    Some('\\') => { self.bump(); Some('\\') },
+                let out = match self.curr {
+                    None => None, // error, but it's printed somewhere else
                     Some(c) => {
-                        self.fatal_span(&format!("invalid escape sequence \
-                            \\{}", c));
                         self.bump();
-                        Some(c)
-                    }
-                }, true)
+                        Some(match c {
+                            'b' => '\u{0008}',
+                            't' => '\t',
+                            'n' => '\n',
+                            'f' => '\u{000c}',
+                            'r' => '\r',
+                            '\'' => '\'',
+                            '\"' => '\"',
+                            '\\' => '\\',
+                            '0' ... '7' => self.scan_octal_escape(),
+                            _ => {
+                                self.fatal_span(&format!("invalid escape \
+                                    sequence \\{}", c));
+                                c // just ignore the backslash (POISON)
+                            }
+                        })
+                    },
+
+                };
+                (out, true)
             }
             Some(c) => {
                 self.bump();
@@ -337,6 +357,33 @@ impl<'a> Tokenizer<'a> {
             },
             None => (None, false),
         }
+    }
+
+    /// Scans 1 to 3 digits from an octal escape sequence and returns the char
+    /// represented by the escape code.
+    ///
+    /// ## Preconditions
+    /// `last` needs to be '0' ... '7'
+    fn scan_octal_escape(&mut self) -> char {
+        // We are allowed to unwrap here (precondition)
+        let mut val = self.last.unwrap().to_digit(8).unwrap();
+
+        if let Some(c) = self.curr.and_then(|c| c.to_digit(8)) {
+            self.bump();
+            val = val * 8 + c;
+        }
+
+        // only values below 0o400 are allowed (0x100)
+        if val < 0o40 {
+            if let Some(c) = self.curr.and_then(|c| c.to_digit(8)) {
+                self.bump();
+                val = val * 8 + c;
+            }
+        }
+
+        // We can unwrap here, because all possible values from 0 to 0o377 are
+        // a valid unicode code point
+        ::std::char::from_u32(val).unwrap()
     }
 
     /// Scans a Java string literal.
