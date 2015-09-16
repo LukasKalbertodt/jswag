@@ -279,6 +279,22 @@ fn string_literals() {
         "\u{0008} \t \n \u{000c} \r \" \' \\".into()
     ))]);
     toks!(r#""\nn""#, [Literal(Lit::Str("\nn".into()))]);
+    reals!(r#""a" "b""#, [
+        Literal(Lit::Str("a".into())), Literal(Lit::Str("b".into()))
+    ]);
+
+    toks!(r"'a'", [Literal(Lit::Char('a'))]);
+    reals!(r#"'\b' '\t' '\n' '\f' '\r' '\"' '\'' '\\'"#, [
+        Literal(Lit::Char('\u{0008}')),
+        Literal(Lit::Char('\t')),
+        Literal(Lit::Char('\n')),
+        Literal(Lit::Char('\u{000c}')),
+        Literal(Lit::Char('\r')),
+        Literal(Lit::Char('"')),
+        Literal(Lit::Char('\'')),
+        Literal(Lit::Char('\\'))
+    ]);
+    reals!(r"'a' 'b'", [Literal(Lit::Char('a')), Literal(Lit::Char('b'))]);
 }
 
 #[test]

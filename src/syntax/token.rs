@@ -327,6 +327,7 @@ gen_enum! {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Lit {
     Str(String),
+    Char(char),
     Integer { raw: String, is_long: bool, radix: u8 },
     Float { raw: String, is_double: bool, radix: u8, exp: String },
     Null,

@@ -300,17 +300,20 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Reads a char inside a string or character literal. If `curr` is a
-    /// backslash, the escape character is parsed, if possible.
+    /// backslash, the escape character is parsed, if possible. The boolean
+    /// value denotes if the returned char was created from a escape sequence.
     ///
     /// Returns `None` if
     /// - `curr` is `None` (EOF),
-    /// - `curr` is the given separator `sep` (either `"` or `'`)
-    /// - an invalid escape sequence was found
-    fn scan_string_char(&mut self, sep: char) -> Option<char> {
+    /// - a '\' followed by EOF is found
+    ///
+    /// Invalid escape sequences result in an error, but the backslash will be
+    /// ignored and the char after it will be returned.
+    fn scan_escaped_char(&mut self) -> (Option<char>, bool) {
         match self.curr {
             Some('\\') => {
                 self.bump();
-                match self.curr {
+                (match self.curr {
                     None => None, // error, but it's handled somewhere else
                     Some('b') => { self.bump(); Some('\u{0008}') },
                     Some('t') => { self.bump(); Some('\t') },
@@ -323,38 +326,63 @@ impl<'a> Tokenizer<'a> {
                     Some(c) => {
                         self.fatal_span(&format!("invalid escape sequence \
                             \\{}", c));
-                        None
+                        self.bump();
+                        Some(c)
                     }
-                }
+                }, true)
             }
-            Some(c) if c == sep => None,
             Some(c) => {
                 self.bump();
-                Some(c)
+                (Some(c), false)
             },
-            None => None,
+            None => (None, false),
         }
     }
 
     /// Scans a Java string literal.
     ///
     /// ## Preconditions
-    /// `curr` needs to be '"'
+    /// `curr` needs to be `"`
     fn scan_string_literal(&mut self) -> String {
-        self.bump();    // discard '"'
+        self.bump();    // discard "
 
         let mut s = String::new();
-        while let Some(c) = self.scan_string_char('\"') {
-            s.push(c);
+        loop {
+            match self.scan_escaped_char() {
+                (Some('\"'), false) => break,
+                (Some(c), _) => s.push(c),
+                (None, _) => {
+                    self.fatal_span("unexpected EOF in string literal");
+                    break;
+                },
+            }
         }
 
-        // check if the loop stopped due to a (proper) '"'
-        if self.curr == Some('\"') {
-            self.bump();
-        } else {
-            self.fatal_span("unexpected EOF in string literal");
-        }
         s
+    }
+
+    /// Scans a Java string literal.
+    ///
+    /// ## Preconditions
+    /// `curr` needs to be `'`
+    fn scan_char_literal(&mut self) -> char {
+        self.bump();    // discard '
+        if let (Some(c), escaped) = self.scan_escaped_char() {
+            if c == '\'' && !escaped {
+                self.fatal_span("empty character literal");
+            } else {
+                // we need another ' to close the literal
+                if self.curr == Some('\'') {
+                    self.bump();
+                    return c;
+                } else {
+                    self.fatal_span("unclosed character literal");
+                }
+            }
+        } else {
+            self.fatal_span("unexpected EOF in character literal");
+        }
+        '\x00'
     }
 
     /// Scans a Java number literal and returns it. The literal may be a float
@@ -682,6 +710,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
             // Literals
             '"' => Token::Literal(Lit::Str(self.scan_string_literal())),
+            '\'' => Token::Literal(Lit::Char(self.scan_char_literal())),
             '0' ... '9' => Token::Literal(self.scan_number_literal()),
 
             // identifier, keyword, bool- or null-literal
