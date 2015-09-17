@@ -268,7 +268,6 @@ impl Display for Token {
 
 gen_enum! {
     #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-    #[allow(unused)]
     pub enum Keyword;
     with to_java_string, display, from_str for:
 

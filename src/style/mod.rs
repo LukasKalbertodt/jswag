@@ -1,7 +1,6 @@
 use syntax::ast;
 use diagnostics::ErrorHandler;
 use std::default::Default;
-use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Error};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
