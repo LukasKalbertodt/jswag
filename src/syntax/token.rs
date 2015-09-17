@@ -1,153 +1,186 @@
-/// Module `token`:
-/// Contains enums and structs, that describe token types in Java.
+//! This module defines basic token types
+//!
+//! The definition of Java tokens is mostly in section 3 (lexical structure) of
+//! the Java language specification.
+//!
+
 use std::fmt::{Display, Formatter, Error};
+use std::str::FromStr;
+use filemap::Span;
 
-// Macro to reduce repeated code for keywords.
-macro_rules! declare_keywords {(
-    $( ($name:ident, $word:expr); )*
-) => {
-    #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-    pub enum Keyword {
-        $( $name, )*
+// Macro to generate enums with helper methods
+macro_rules! gen_helper {
+    (
+        $name:ident; ;
+        $($variant:ident = $val:expr),+
+    ) => { };
+    (
+        $name:ident;
+        $helper:ident $(, $tail:ident)*;
+        $($variant:ident = $val:expr),+
+    ) => {
+        $helper!($name; $($variant = $val),+ );
+        gen_helper!($name; $($tail),*; $($variant = $val),+);
+    };
+}
+
+macro_rules! gen_enum {
+    (
+        $(#[$attr:meta])*
+        pub enum $name:ident;
+        with $($helper:ident),* for:
+        $($variant:ident = $val:expr),+
+    ) => {
+        $(
+            #[$attr]
+        )*
+        pub enum $name {
+            $($variant,)*
+        }
+        gen_helper!($name; $($helper),*; $( $variant = $val ),+);
     }
+}
 
-    impl Keyword {
-        /// Returns the java string of the keyword
-        pub fn as_java_string(&self) -> &'static str {
-            match *self {
-                $( Keyword::$name => $word, )*
+macro_rules! to_java_string {
+    ($name:ident; $($variant:ident = $val:expr),+) => {
+        impl $name {
+            pub fn as_java_string(&self) -> &'static str {
+                match self {
+                    $( &$name::$variant => $val ,)*
+                }
             }
         }
+    }
+}
 
-        /// Returns the enum variant corresponding to the given string
-        /// or None if the string does no represent a valid keyword.
-        pub fn from_str(s: &String) -> Option<Self> {
-            match &**s {
-                $( $word => Some(Keyword::$name), )*
-                _ => None,
+macro_rules! display {
+    ($name:ident; $($variant:ident = $val:expr),+) => {
+        impl Display for $name {
+            fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+                self.as_java_string().fmt(f)
             }
         }
     }
+}
 
-    impl Display for Keyword {
-        fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-            write!(f, "{}", self.as_java_string())
+macro_rules! from_str {
+    ($name:ident; $($variant:ident = $val:expr),+) => {
+        impl FromStr for $name {
+            type Err = ();
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $($val => Ok($name::$variant), )*
+                    _ => Err(()),
+                }
+            }
         }
     }
-}}
-
-declare_keywords! {
-    // modifier
-    (Public,        "public");
-    (Protected,     "protected");
-    (Private,       "private");
-    (Abstract , "abstract");
-    (Static , "static");
-    (Final , "final");
-    (Synchronized , "synchronized");
-    (Native , "native");
-    (Strictfp , "strictfp");
-    (Transient , "transient");
-    (Volatile , "volatile");
-
-    (Class,         "class");
-    (Import,        "import");
-
-    // control structures
-    (Do,     "do");
-    (While,  "while");
-    (For,    "for");
-    (If,     "if");
-    (Else,   "else");
 }
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BinOpToken {
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Percent,
-    Caret,
-    And,
-    Or,
-    Shl,
-    Shr,
+/// A token with it's span in the source text
+#[derive(Debug, Clone, PartialEq)]
+pub struct TokenSpan {
+    pub tok: Token,
+    /// Byte position of token in Filemap
+    pub span: Span,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum DelimToken {
-    Paren,      // round ( )
-    Bracket,    // square [ ]
-    Brace,      // curly { }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Lit {
-    Str(String),
-    Integer(String)
-}
-
-
+/// A Java token
+///
+/// This enum differs a bit from the original definition in the Java spec, in
+/// which this `Token` is called *InputElement* and is defined as:
+/// ```
+/// WhiteSpace  |  Comment  |  Token
+/// ```
+/// The Java-*Token* is defined as:
+/// ```
+/// Identifier  |  Keyword  |  Literal  |  Seperator  |  Operator
+/// ```
+///
+/// This `Token` type differs from the formal and correct definition to make
+/// the parser and lexer module less verbose. The differences are:
+/// - all 5 variants of the Java-*Token* are direct variants of this `Token`
+/// - therefore the name Java-*Token* is not necessary and Java's
+///   *InputElement* is called `Token` instead
+/// - *Seperator*s and *Operator*s are also direct variants of this `Token`
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
-    // Ignored tokens
+    // Variants of the Java-*InputElement* (not "real" tokens)
     Whitespace,
     Comment,
 
-    // Simple one char tokens
-    Dot,
-    Comma,
-    Semi,
+    // Variants of the Java-*Token*
+    Ident(String),
+    KeyW(Keyword),
+    Literal(Lit),
 
-    // Operators
+    // Variants of Java-*Seperator*
+    // (   )   {   }   [   ]   ;   ,   .   ...   @   ::
+    ParenOp,
+    ParenCl,
+    BraceOp,
+    BraceCl,
+    BracketOp,
+    BracketCl,
+    Semi,
+    Comma,
+    Dot,
+    DotDotDot,
+    At,
+    ColonSep,
+
+    // Variants of Java-*Operator*
+    // =   >   <   !   ~   ?   :   ->
     Eq,
-    Lt,
-    Le,
-    EqEq,
-    Ne,
-    Ge,
     Gt,
+    Lt,
+    Bang,
+    Tilde,
+    Question,
+    Colon,
+    Arrow,
+
+    // ==  >=  <=  !=  &&  ||  ++  --
+    EqEq,
+    Ge,
+    Le,
+    Ne,
     AndAnd,
     OrOr,
-    Not,
-    Tilde,
+    PlusPlus,
+    MinusMinus,
 
+    // +   -   *   /   &   |   ^   %   <<   >>   >>>
     Plus,
     Minus,
     Star,
     Slash,
-    Percent,
-    Caret,
     And,
     Or,
+    Caret,
+    Percent,
     Shl,
     Shr,
+    ShrUn,
 
+    // +=  -=  *=  /=  &=  |=  ^=  %=  <<=  >>=  >>>=
     PlusEq,
     MinusEq,
     StarEq,
     SlashEq,
-    PercentEq,
-    CaretEq,
     AndEq,
     OrEq,
+    CaretEq,
+    PercentEq,
     ShlEq,
     ShrEq,
-
-    // Long string tokens
-    Keyword(Keyword),
-    Word(String),
-
-    Literal(Lit),
-
-    OpenDelim(DelimToken),
-    CloseDelim(DelimToken),
+    ShrUnEq,
 }
 
 impl Token {
-    // Returns true if the token is not an ignored token (whitespace/comment)
+    /// Returns true if the token is a "real" token (aka. a Java-*Token*)
     pub fn is_real(&self) -> bool {
         match *self {
             Token::Whitespace | Token::Comment => false,
@@ -155,74 +188,75 @@ impl Token {
         }
     }
 
-    pub fn as_java_string(&self) -> String {
+    /// String for error reporting. Example:
+    /// ```
+    /// Excpected one of `,` `;` `)`
+    /// ```
+    pub fn as_java_string(&self) -> &'static str {
+        use self::Token::*;
         match self.clone() {
-            Token::Whitespace => "'whitespace'",
-            Token::Comment => "'comment'",
+            Whitespace => "whitespace",
+            Comment => "comment",
 
-            Token::Dot => ".",
-            Token::Comma => ",",
-            Token::Semi => ";",
+            Ident(_) => "identifier",
+            KeyW(keyword) => keyword.as_java_string(),
+            Literal(..) => "Lit(???)",
 
-            Token::Eq => "=",
-            Token::Lt => "<",
-            Token::Le => "<=",
-            Token::EqEq => "==",
-            Token::Ne => "!=",
-            Token::Ge => ">=",
-            Token::Gt => ">",
-            Token::AndAnd => "&&",
-            Token::OrOr => "||",
-            Token::Not => "!",
-            Token::Tilde => "~",
+            ParenOp => "(",
+            ParenCl => ")",
+            BraceOp => "{",
+            BraceCl => "}",
+            BracketOp => "[",
+            BracketCl => "]",
+            Semi => ";",
+            Comma => ",",
+            Dot => ".",
+            DotDotDot => "...",
+            At => "@",
+            ColonSep => "::",
 
-            Token::Plus => "+",
-            Token::Minus => "-",
-            Token::Star => "*",
-            Token::Slash => "/",
-            Token::Percent => "%",
-            Token::Caret => "^",
-            Token::And => "&",
-            Token::Or => "|",
-            Token::Shl => "<<",
-            Token::Shr => ">>",
+            Eq => "=",
+            Gt => ">",
+            Lt => "<",
+            Bang => "!",
+            Tilde => "~",
+            Question => "?",
+            Colon => ":",
+            Arrow => "->",
 
-            Token::PlusEq => "+=",
-            Token::MinusEq => "-=",
-            Token::StarEq => "*=",
-            Token::SlashEq => "/=",
-            Token::PercentEq => "%=",
-            Token::CaretEq => "^=",
-            Token::AndEq => "&=",
-            Token::OrEq => "|=",
-            Token::ShlEq => "<<=",
-            Token::ShrEq => ">>=",
+            EqEq => "==",
+            Ge => ">=",
+            Le => "<=",
+            Ne => "!=",
+            AndAnd => "&&",
+            OrOr => "||",
+            PlusPlus => "++",
+            MinusMinus => "--",
 
-            Token::Keyword(keyword) => keyword.as_java_string(),
-            // Token::Word(ref w) => format!("Word('{}')", w).as_str() ,
-            Token::Word(ref w) => {
-                if w.is_empty() {
-                    "Ident"
-                } else {
-                    w.as_ref()
-                }
-            },
+            Plus => "+",
+            Minus => "-",
+            Star => "*",
+            Slash => "/",
+            And => "&",
+            Or => "|",
+            Caret => "^",
+            Percent => "%",
+            Shl => "<<",
+            Shr => ">>",
+            ShrUn => ">>>",
 
-            Token::Literal(..) => "Lit(???)",
-
-            Token::OpenDelim(delim) => match delim {
-                DelimToken::Brace => "{",
-                DelimToken::Paren => "(",
-                DelimToken::Bracket => "[",
-            },
-            Token::CloseDelim(delim) => match delim {
-                DelimToken::Brace => "}",
-                DelimToken::Paren => ")",
-                DelimToken::Bracket => "]",
-            },
-
-            // _ => "'???'",
-        }.to_string()
+            PlusEq => "+=",
+            MinusEq => "-=",
+            StarEq => "*=",
+            SlashEq => "/=",
+            AndEq => "&=",
+            OrEq => "|=",
+            CaretEq => "^=",
+            PercentEq => "%=",
+            ShlEq => "<<=",
+            ShrEq => ">>=",
+            ShrUnEq => ">>>=",
+        }
     }
 }
 
@@ -230,4 +264,72 @@ impl Display for Token {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "{}", self.as_java_string())
     }
+}
+
+gen_enum! {
+    #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+    #[allow(unused)]
+    pub enum Keyword;
+    with to_java_string, display, from_str for:
+
+    Abstract = "abstract",
+    Assert = "assert",
+    Boolean = "boolean",
+    Break = "break",
+    Byte = "byte",
+    Case = "case",
+    Catch = "catch",
+    Char = "char",
+    Class = "class",
+    Const = "const",
+    Continue = "continue",
+    Default = "default",
+    Do = "do",
+    Double = "double",
+    Else = "else",
+    Enum = "enum",
+    Extends = "extends",
+    Final = "final",
+    Finally = "finally",
+    Float = "float",
+    For = "for",
+    If = "if",
+    Goto = "goto",
+    Implements = "implements",
+    Import = "import",
+    Instanceof = "instanceof",
+    Int = "int",
+    Interface = "interface",
+    Long = "long",
+    Native = "native",
+    New = "new",
+    Package = "package",
+    Private = "private",
+    Protected = "protected",
+    Public = "public",
+    Return = "return",
+    Short = "short",
+    Static = "static",
+    Strictfp = "strictfp",
+    Super = "super",
+    Switch = "switch",
+    Synchronized = "synchronized",
+    This = "this",
+    Throw = "throw",
+    Throws = "throws",
+    Transient = "transient",
+    Try = "try",
+    Void = "void",
+    Volatile = "volatile",
+    While = "while"
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Lit {
+    Str(String),
+    Char(char),
+    Integer { raw: String, is_long: bool, radix: u8 },
+    Float { raw: String, is_double: bool, radix: u8, exp: String },
+    Null,
+    Bool(bool),
 }

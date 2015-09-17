@@ -1,12 +1,11 @@
-#![allow(unused_imports)]
+#![cfg_attr(test, allow(unused))]
 extern crate term_painter;
 
 use std::path::Path;
 use std::error::Error;
 use filemap::open_file;
 use diagnostics::ErrorHandler;
-use term_painter::{Color, ToStyle};
-use syntax::parser::Parser;
+use syntax::parse::Parser;
 use std::default::Default;
 
 mod syntax;
@@ -14,8 +13,11 @@ mod diagnostics;
 mod filemap;
 mod style;
 
-
+#[allow(unused)]
 fn main() {
+    use term_painter::{Color, ToStyle};
+
+
     let filemap = match open_file(Path::new("examples/Quersumme.java")) {
         Err(e) => panic!("Error opening file: {}", e.description()),
         Ok(fmap) => fmap,
@@ -38,9 +40,9 @@ fn main() {
 
     // let reals = toks.filter(|t| t.tok.is_real());
 
-    // // let mut t = term::stdout().unwrap();
+    // // // let mut t = term::stdout().unwrap();
 
-    // // let mut old_line = 0;
+    // // // let mut old_line = 0;
     // for tok in reals {
     //     // printing line prefix
     //     // let new_line = filemap.get_loc(tok.span.lo).line;

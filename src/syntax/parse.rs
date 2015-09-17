@@ -1,6 +1,6 @@
 use std::iter::{Iterator};
 use super::token::*;
-use super::lexer::{Tokenizer, TokenSpan};
+use super::lex::Tokenizer;
 use std::boxed::Box;
 use super::ast;
 use filemap::Span;
@@ -9,6 +9,7 @@ use diagnostics::ErrorHandler;
 use std::mem::swap;
 use std::collections::HashMap;
 use std::default::Default;
+use std::fmt::Write;
 
 enum PErr {
     Fatal,
@@ -57,13 +58,13 @@ impl<'a> Parser<'a> {
 
             let curr = try!(self.curr());
             match curr.tok {
-                Token::Keyword(Keyword::Import) => {
+                Token::KeyW(Keyword::Import) => {
                     self.bump();
                     cu.items.push(ast::Item::Import(try!(self.parse_import())));
                 },
                 // TODO: Detecting beginning of class is more complex. It could
                 // start with variouWass keywords and could be an interface.
-                Token::Keyword(Keyword::Public) | Token::Keyword(Keyword::Class) => {
+                Token::KeyW(Keyword::Public) | Token::KeyW(Keyword::Class) => {
                     let boxed = Box::new(try!(self.parse_top_lvl_class()));
                     cu.items.push(ast::Item::Class(boxed));
                 }
@@ -74,10 +75,16 @@ impl<'a> Parser<'a> {
         Ok(cu)
     }
 
-    fn skip_block(&mut self, d: DelimToken) -> PResult<()> {
+    fn skip_block(&mut self, opening: Token) -> PResult<()> {
         // Just call the function if the next token is a '{'
-        try!(self.eat(Token::OpenDelim(d)));
+        try!(self.eat(opening.clone()));
         let mut depth = 1;
+        let closing = match opening {
+            Token::ParenOp => Token::ParenCl,
+            Token::BracketOp => Token::BracketCl,
+            Token::BraceOp => Token::BraceCl,
+            _ => unreachable!(),
+        };
 
         while depth > 0 {
             match self.curr {
@@ -85,14 +92,10 @@ impl<'a> Parser<'a> {
                     return Err(PErr::Fatal);
                 },
                 Some(ref curr) => {
-                    match curr.tok {
-                        Token::OpenDelim(delim) if delim == d => {
-                            depth += 1;
-                        },
-                        Token::CloseDelim(delim) if delim == d => {
-                            depth -= 1;
-                        },
-                        _ => {}
+                    if curr.tok == opening {
+                        depth += 1;
+                    } else if curr.tok == closing {
+                        depth -= 1;
                     }
                 },
             }
@@ -111,12 +114,12 @@ impl<'a> Parser<'a> {
             // modifier is allowed only once.
             // Stop searching when the first non-modifier token appears.
             macro_rules! check_keywords {
-                ($($k:ident,)*) => {{
+                ($($k:ident),*) => {{
                     // Modifiers are in front of other stuff, so there should
                     // be a next token (program is illformed otherwise).
                     let curr = try!(self.curr());
                     match curr.tok {
-                        $( k @ Token::Keyword(Keyword::$k) => {
+                        $( k @ Token::KeyW(Keyword::$k) => {
                             if mods.insert(ast::Modifier::$k, curr.span).is_some() {
                                 return Err(self.err_dupe(k, curr.span));
                             }
@@ -127,7 +130,7 @@ impl<'a> Parser<'a> {
             }
 
             check_keywords!(Public, Private, Protected, Abstract, Static,
-                Final, Synchronized, Native, Strictfp, Transient, Volatile,);
+                Final, Synchronized, Native, Strictfp, Transient, Volatile);
 
             // consume token
             self.bump();
@@ -159,7 +162,7 @@ impl<'a> Parser<'a> {
         }
 
         // `class` is expected now.
-        try!(self.eat(Token::Keyword(Keyword::Class)));
+        try!(self.eat(Token::KeyW(Keyword::Class)));
 
         // `class` was parsed, next token should be class name
         c.name = try!(self.eat_ident());
@@ -171,18 +174,18 @@ impl<'a> Parser<'a> {
         // try!(self.skip_brace_block());
 
         // Start of class body
-        try!(self.eat(Token::OpenDelim(DelimToken::Brace)));
+        try!(self.eat(Token::BraceOp));
 
         loop {
             // If a closing brace closes the class -> stop parsing
-            if try!(self.eat_maybe(Token::CloseDelim(DelimToken::Brace))) {
+            if try!(self.eat_maybe(Token::BraceCl)) {
                 break;
             }
 
             // Try to parse a member. It starts with modifiers.
             let mmods = try!(self.parse_modifiers());
 
-            // Next up will be a type
+            // Next up will be a type (either a ident or a keyword)
             let ty = try!(self.eat_ident());
 
             // Next up: Method name or first field name
@@ -193,7 +196,7 @@ impl<'a> Parser<'a> {
             // could either be `;`, `=` or `,`.
 
             match try!(self.curr()).tok {
-                Token::OpenDelim(DelimToken::Paren) => {
+                Token::ParenOp => {
                     c.methods.push(try!(self.parse_method(name, ty, mmods)));
                 },
                 Token::Semi | Token::Eq | Token::Comma => {
@@ -204,7 +207,7 @@ impl<'a> Parser<'a> {
                 }
                 o @ _ => {
                     return Err(self.err_unexpected(
-                        &[Token::OpenDelim(DelimToken::Paren), Token::Semi,
+                        &[Token::ParenOp, Token::Semi,
                         Token::Eq, Token::Comma], o));
                 }
             }
@@ -268,16 +271,16 @@ impl<'a> Parser<'a> {
 
         // parse parameter list
         // TODO: ReceiverParamter + LastFormalParameter
-        try!(self.eat(Token::OpenDelim(DelimToken::Paren)));
+        try!(self.eat(Token::ParenOp));
 
-        while !try!(self.eat_maybe(Token::CloseDelim(DelimToken::Paren))) {
+        while !try!(self.eat_maybe(Token::ParenCl)) {
             let mut param = ast::FormalParameter {
                 ty: ast::Ident::default(),
                 name: ast::Ident::default(),
                 dims: 0,
                 final_: false,
             };
-            param.final_ = try!(self.eat_maybe(Token::Keyword(Keyword::Final)));
+            param.final_ = try!(self.eat_maybe(Token::KeyW(Keyword::Final)));
             param.ty = try!(self.eat_ident());  // type
             param.dims = try!(self.parse_dims());
             param.name = try!(self.eat_ident());  // name
@@ -293,7 +296,7 @@ impl<'a> Parser<'a> {
         // try!(self.skip_block(DelimToken::Paren));
 
         // skip body
-        try!(self.skip_block(DelimToken::Brace));
+        try!(self.skip_block(Token::BraceOp));
 
         Ok(meth)
     }
@@ -301,8 +304,8 @@ impl<'a> Parser<'a> {
     fn parse_dims(&mut self) -> PResult<usize> {
         let mut count = 0;
         loop {
-            if try!(self.eat_maybe(Token::OpenDelim(DelimToken::Bracket))) {
-                try!(self.eat(Token::CloseDelim(DelimToken::Bracket)));
+            if try!(self.eat_maybe(Token::BracketOp)) {
+                try!(self.eat(Token::BracketCl));
                 count += 1;
             } else {
                 break;
@@ -341,11 +344,11 @@ impl<'a> Parser<'a> {
                     try!(self.eat(Token::Semi));
                     return Ok(ast::Import::Wildcard(name));
                 },
-                Token::Word(..) => {
+                Token::Ident(..) => {
                     w = try!(self.eat_ident());
                 },
                 f @ _ => return Err(self.err_unexpected(
-                    &[Token::Star, Token::Word("".to_string())], f)),
+                    &[Token::Star, Token::Ident("".to_string())], f)),
             }
         }
     }
@@ -354,11 +357,11 @@ impl<'a> Parser<'a> {
         let curr = try!(self.curr());
 
         match curr {
-            TokenSpan { tok: Token::Word(name), span } => {
+            TokenSpan { tok: Token::Ident(name), span } => {
                 self.bump();
                 Ok(ast::Ident { name: name, span: span } )
             },
-            _ => Err(self.err_unexpected(&[Token::Word("".to_string())], curr.clone().tok)),
+            _ => Err(self.err_unexpected(&[Token::Ident("".to_string())], curr.clone().tok)),
         }
     }
 
@@ -383,7 +386,8 @@ impl<'a> Parser<'a> {
     }
 
     // fn expect_one_of(&mut self, eat: &[Token]/*, spare: &[Token]*/)
-    //     -> PResult<TokenSpan> {
+    //     -> PResult<TokenSpan>
+    // {
     //     let curr = try!(self.curr());
     //     if eat.contains(&curr.tok) {
     //         self.bump();
@@ -425,18 +429,38 @@ impl<'a> Parser<'a> {
     }
 
     fn err_unexpected(&self, expected: &[Token], found: Token) -> PErr {
-        let list = expected.iter().enumerate().fold(String::new(), |mut list, (idx, ref t)| {
-            list.push_str(&*format!("`{}`", t));
-            if idx + 2 < expected.len() {
-                list.push_str(", ");
-            } else if idx + 2 == expected.len() {
-                list.push_str(" or ");
-            }
-            list
-        });
 
-        self.e.span_err(self.curr.clone().unwrap().span,
-            format!("Unexpected token: Expected {}, found `{}`", list, found));
+        let mut list = String::new();
+        for (i, t) in expected.iter().enumerate() {
+            let sep = if i + 1 == expected.len() {
+                ""
+            } else if i + 2 == expected.len() {
+                " or "
+            } else {
+                ", "
+            };
+
+            let _ = match t {
+                &Token::Ident(_) | &Token::Literal(_)
+                    => write!(list, "{}{}", t, sep),
+                _ => write!(list, "`{}`{}", t, sep),
+            };
+        }
+        // expected.iter().map(|mut list, (idx, ref t)| {
+        //     list.push_str(&*format!("`{}`", t));
+        //     if idx + 2 < expected.len() {
+        //         list.push_str(", ");
+        //     } else if idx + 2 == expected.len() {
+        //         list.push_str(" or ");
+        //     }
+        //     list
+        // });
+
+        let msg = format!(
+            "Unexpected token: Expected {}{}, found `{}`",
+            if expected.len() > 1 { "one of" } else { "" },
+            list, found);
+        self.e.span_err(self.curr.clone().unwrap().span, msg);
         PErr::Fatal
     }
 }

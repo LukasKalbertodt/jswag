@@ -1,7 +1,9 @@
-mod lexer;
+mod lex;
 mod token;
 pub mod ast;
-pub mod parser;
+pub mod parse;
 
 pub use self::token::*;
-pub use self::lexer::*;
+pub use self::lex::Tokenizer;
+
+mod test;

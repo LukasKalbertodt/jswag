@@ -1,3 +1,6 @@
+// TODO: Remove
+#![allow(dead_code)]
+
 use std::fmt::{Display, Formatter, Error};
 use filemap::Span;
 use std::vec::Vec;

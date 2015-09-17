@@ -31,7 +31,7 @@ impl ErrorHandler {
 
             println!("{}:{}: {}",
                 self.fmap.filename,
-                Blue.paint(start.line),
+                Blue.paint(start.line + 1),
                 self.fmap.get_line(start.line));
 
             // Print spaces until the span start is reached
@@ -51,7 +51,7 @@ impl ErrorHandler {
             for line in start.line .. end.line + 1 {
                 println!("{}:{}: {}",
                     self.fmap.filename,
-                    Blue.paint(line),
+                    Blue.paint(line + 1),
                     self.fmap.get_line(line));
             }
         }
@@ -59,13 +59,13 @@ impl ErrorHandler {
 
     pub fn span_err(&self, span: Span, m: String) {
         let start = self.fmap.get_loc(span.lo);
-        let end = self.fmap.get_loc(span.hi - 1);
+        let end = self.fmap.get_loc(span.hi);
 
         println!("");
         println!("{file}:{sl}:{sc} .. {el}:{ec}: {error} {m}",
             file=self.fmap.filename,
-            sl=Blue.paint(start.line), sc=start.col,
-            el=Blue.paint(end.line), ec=end.col,
+            sl=Blue.paint(start.line + 1), sc=start.col,
+            el=Blue.paint(end.line + 1), ec=end.col,
             error=Red.paint("error:"), m=Bold.paint(m));
 
         self.print_snippet(start, end, Red);
@@ -74,13 +74,13 @@ impl ErrorHandler {
 
     pub fn span_note(&self, span: Span, m: String) {
         let start = self.fmap.get_loc(span.lo);
-        let end = self.fmap.get_loc(span.hi - 1);
+        let end = self.fmap.get_loc(span.hi);
 
         println!("");
         println!("{file}:{sl}:{sc} .. {el}:{ec}: {error} {m}",
             file=self.fmap.filename,
-            sl=Blue.paint(start.line), sc=start.col,
-            el=Blue.paint(end.line), ec=end.col,
+            sl=Blue.paint(start.line + 1), sc=start.col,
+            el=Blue.paint(end.line + 1), ec=end.col,
             error=Green.paint("note:"), m=Bold.paint(m));
 
         self.print_snippet(start, end, Green);
