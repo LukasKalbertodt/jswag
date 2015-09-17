@@ -1,0 +1,6 @@
+language: rust
+rust:
+  - stable
+  - nightly
+before_install:
+  - bash check-style.sh
