@@ -19,6 +19,14 @@
 //! possible. This behaviour enables the parser to operate normally and the
 //! tokenizer to report all lexing errors.
 //!
+//! This tokenizer is greedy in all cases and will consume as many chars as
+//! possible. That behaviour is specified in section 3.2 with one exception:
+//! In a type context, consecutive '>' chars should not be lexed as shift-right
+//! or shift-right-unsigned, but as single greater-than tokens. Since the
+//! tokenizer does not know anything about type contexts, it can't distinguish
+//! between those tokens. This tokenizer will be greedy in that case, too. The
+//! parser needs to handle incorrectly lexed shift-right's.
+//!
 
 use diagnostics::ErrorHandler;
 use filemap::{FileMap, Span, SrcIndex};
@@ -239,13 +247,6 @@ impl<'a> Tokenizer<'a> {
         self.bump();
     }
 
-    /// Convenience function to return a char iterator over `curr`. See
-    /// `CharIter` for more info.
-    /// TODO: This function is only used once... so we might remove it.
-    fn iter<'b>(&'b mut self) -> CharIter<'b, 'a> {
-        CharIter::new(self)
-    }
-
     /// Prints a fatal error message through error diagnostic using the
     /// span (token_start, peek_pos)
     fn fatal_span(&mut self, m: &str) {
@@ -277,9 +278,15 @@ impl<'a> Tokenizer<'a> {
         // Note: `self.peek.is_some()` implies `self.curr.is_some()`
         if self.peek == Some('*') {
             // Skip everything until the end of file or a "*/" is reached.
-            while self.peek.is_some() &&
-                !(self.curr == Some('*') && self.peek == Some('/')) {
-                self.bump();
+            loop {
+                match (self.curr, self.peek) {
+                    (Some('*'), Some('/')) => break,
+                    (_, None) => {
+                        self.fatal_span("unclosed comment block");
+                        break;
+                    }
+                    _ => self.bump(),
+                }
             }
             self.dbump();   // skip last two chars
         } else {
@@ -304,11 +311,18 @@ impl<'a> Tokenizer<'a> {
     /// `curr` needs to be a Java identifier start.
     fn scan_word(&mut self) -> Token {
         // Collect all chars until the first non-ident char or EOF is reached.
-        let s: String = self.iter()
-            .take_while(|&c| is_java_ident_part(c))
-            .collect();
+        let mut s = String::new();
+        loop {
+            match self.curr {
+                Some(c) if is_java_ident_part(c) => {
+                    s.push(c);
+                    self.bump();
+                },
+                _ => break,
+            }
+        }
 
-        // check if the word is a keyword
+        // check if the word is a keyword or literal
         match &s[..] {
             "true" => Token::Literal(Lit::Bool(true)),
             "false" => Token::Literal(Lit::Bool(false)),
@@ -652,11 +666,12 @@ impl<'a> Iterator for Tokenizer<'a> {
         self.token_start = self.curr_pos;
         let p = self.peek.unwrap_or('\x00');
 
-        if self.curr.is_none() {
-            return None;
-        }
+        let curr = match self.curr {
+            None => return None,
+            Some(c) => c,
+        };
 
-        let t = match self.curr.unwrap() {
+        let t = match curr {
             // non-real tokens: whitespace and comments
             c if is_java_whitespace(c) => {
                 self.skip_whitespace();
@@ -677,6 +692,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             ';' => { self.bump(); Token::Semi },
             ',' => { self.bump(); Token::Comma },
             '.' => {
+                // it might be the start of a float literal
                 match p {
                     '0' ... '9' => Token::Literal(self.scan_number_literal()),
                     _ => {
@@ -782,44 +798,6 @@ impl<'a> Iterator for Tokenizer<'a> {
             tok: t,
             span: Span { lo: self.token_start, hi: self.last_pos },
         })
-    }
-}
-
-// ===========================================================================
-// Definition of a helper iterator
-// ===========================================================================
-/// Helper type to iterate over the current chars of the tokenizer. Only used
-/// by the tokenizer itself.
-///
-/// Whenever the iterator yields a char 'c', it is equal to `origin.curr`. That
-/// means that after using the iterator, `curr` of the original tokenizer
-/// equals the last char yielded by the iterator. However, the first char
-/// yielded is also `curr` of the tokenizer.
-/// It means that calling `next` n times will call `origin.bump()` n-1 times.
-struct CharIter<'tok, 's: 'tok> {
-    origin: &'tok mut Tokenizer<'s>,
-    first: bool,
-}
-
-impl<'tok, 's> CharIter<'tok, 's> {
-    fn new(orig: &'tok mut Tokenizer<'s>) -> CharIter<'tok, 's> {
-        CharIter {
-            origin: orig,
-            first: true,
-        }
-    }
-}
-
-impl<'tok, 's> Iterator for CharIter<'tok, 's> {
-    type Item = char;
-
-    fn next(&mut self) -> Option<char> {
-        if self.first {
-            self.first = false;
-        } else {
-            self.origin.bump();
-        }
-        self.origin.curr
     }
 }
 
