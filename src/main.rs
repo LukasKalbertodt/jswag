@@ -10,16 +10,12 @@ use docopt::Docopt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use term_painter::{Attr, Color, ToStyle};
 
-/// Helper to do something conditionally depending on the `--verbose` flag
-macro_rules! verbose {
-    ($body:block) => {{
-        if VERBOSE.load(Ordering::Relaxed) {
-            $body
-        }
-    }}
-}
+#[macro_use]
+mod util;
+mod java;
 
-/// We store globally if the `--verbose` flag was set
+/// We store globally if the `--verbose` flag was set. This might change later
+/// on, since it doesn't scale well and is ugly. Easy for now, though.
 lazy_static! {
     static ref VERBOSE: AtomicBool = AtomicBool::new(false);
 }
@@ -130,6 +126,11 @@ fn main() {
                 Color::Green.bold().paint("> Starting action:")
             );
         }}
+
+        if java::compile(&args.arg_file).is_err() {
+            note!("run `jswag` again with `--verbose` to obtain additional \
+                information.");
+        }
     }
 
     // Third main action: run compiled files (`--run`)
