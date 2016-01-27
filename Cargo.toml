@@ -4,5 +4,16 @@ version = "0.2.0"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 
 [dependencies]
-xswag-base = "0.1"
-xswag-syntax-java = "0.1"
+docopt = "0.6"
+rustc-serialize = "0.3"
+term-painter = "0.2"
+# xswag-base = "0.1"
+# xswag-syntax-java = "0.1"
+
+[dependencies.xswag-syntax-java]
+git = "https://github.com/LukasKalbertodt/xswag-syntax-java"
+branch = "master"
+
+[dependencies.xswag-base]
+git = "https://github.com/LukasKalbertodt/xswag-base"
+branch = "pre-rel"
