@@ -1,34 +1,54 @@
 use std::process::{Command, ExitStatus};
+use std::path::Path;
 use std::io;
+use super::{JAVAC_NAME, JAVA_NAME};
 
 
 /// Calls `javac` with the given files
-pub fn compile(files: &[String]) -> Result<(), Error> {
-    let javac_command = "javac";
+pub fn compile(file: &str) -> Result<(), Error> {
+    // Print what we are about to do
+    verbose! {{
+        executing!("`{} {}`", JAVAC_NAME, file);
+    }}
 
-    for file in files {
-        // Print what we are about to do
-        verbose! {{
-            executing!("`{} {}`", javac_command, file);
-        }}
+    // Spawn new child process
+    let child = Command::new(JAVAC_NAME)
+                        .arg(file)
+                        .spawn();
+    let mut child = try!(child);
 
-        // Spawn new child process
-        let child = Command::new(javac_command)
-                            .arg(file)
-                            .spawn();
-        let mut child = try!(child);
+    let status = try!(child.wait());
 
-        let status = try!(child.wait());
-
-        // Stop processing, if javac failed to compile.
-        if !status.success() {
-            return Err(Error::JavacFailure(status));
-        }
+    // Stop processing, if javac failed to compile.
+    if !status.success() {
+        return Err(Error::JavacFailure(status));
     }
 
     Ok(())
 }
 
+pub fn run<P: AsRef<Path>>(class: &str, path: P) -> Result<(), Error> {
+    // Print what we are about to do
+    verbose! {{
+        executing!("`{} {}`", JAVA_NAME, class);
+    }}
+
+    // Spawn new child process
+    let child = Command::new(JAVA_NAME)
+                        .arg(class)
+                        .current_dir(path)
+                        .spawn();
+    let mut child = try!(child);
+
+    let status = try!(child.wait());
+
+    // Stop processing, if javac failed to compile.
+    if !status.success() {
+        return Err(Error::JavacFailure(status));
+    }
+
+    Ok(())
+}
 
 #[derive(Debug)]
 pub enum Error {

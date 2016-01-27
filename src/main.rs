@@ -127,7 +127,7 @@ fn main() {
             );
         }}
 
-        if java::compile(&args.arg_file).is_err() {
+        if java::compile_all(&args.arg_file).is_err() {
             note!("run `jswag` again with `--verbose` to obtain additional \
                 information.");
         }
@@ -141,5 +141,10 @@ fn main() {
                 Color::Green.bold().paint("> Starting action:")
             );
         }}
+
+        if java::run_first_main(&args.arg_file).is_err() {
+            note!("run `jswag` again with `--verbose` to obtain additional \
+                information.");
+        }
     }
 }
