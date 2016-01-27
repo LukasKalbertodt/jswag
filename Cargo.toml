@@ -5,6 +5,7 @@ authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 
 [dependencies]
 docopt = "0.6"
+lazy_static = "0.1"
 rustc-serialize = "0.3"
 term-painter = "0.2"
 # xswag-base = "0.1"
