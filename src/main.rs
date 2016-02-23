@@ -12,6 +12,7 @@ use term_painter::{Attr, Color, ToStyle};
 #[macro_use]
 mod ui;
 mod args;
+mod config;
 mod dispatch;
 mod java;
 mod job;
@@ -31,14 +32,22 @@ fn main() {
             Attr::Bold.paint("jswag --help"),
             Attr::Bold.paint("jswag (-V | --version)"),
         );
-        return;
+        std::process::exit(config::EXIT_NO_INPUT);
     }
 
     // Parse command line arguments with docopt and exit if anything went
     // wrong.
     let args: Args = Docopt::new(args::USAGE)
-                                .and_then(|d| d.decode())
-                                .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.decode())
+        .unwrap_or_else(|e| {
+            if e.fatal() {
+                println!("{}", e);
+                std::process::exit(config::EXIT_INVALID_INPUT);
+            } else {
+                println!("{}", e);
+                std::process::exit(0)
+            }
+        });
 
 
     // If the `--version` flag was set, we do nothing but print the version.
@@ -51,7 +60,7 @@ fn main() {
     let job = match Job::from_args(args) {
         None => {
             println!("Abort due to CLI parameter errors...");
-            return;
+            std::process::exit(config::EXIT_INVALID_INPUT);
         },
         Some(j) => j,
     };
