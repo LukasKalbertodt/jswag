@@ -1,7 +1,6 @@
 pub const USAGE: &'static str = "
-Usage: jswag build [options] [<file>...]
-       jswag run [options] [<file>...]
-       jswag [options] <file>...
+Usage: jswag build [options] <file>...
+       jswag run [options] <file>...
        jswag (--help | --version)
 
 Commands:
@@ -39,3 +38,7 @@ pub struct Args {
     pub flag_verbose: bool,
     pub flag_version: bool,
 }
+
+// TODO: add this
+//      jswag [options] [<file>...]
+// semantics are still quite unclear
