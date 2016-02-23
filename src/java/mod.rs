@@ -4,7 +4,7 @@
 /// module contains functions for pretty printing the output of `inner`.
 
 mod inner;
-
+use job::Job;
 use std::path::Path;
 use self::inner::Error;
 
@@ -12,15 +12,15 @@ const JAVAC_NAME: &'static str = "javac";
 const JAVA_NAME: &'static str = "java";
 
 /// Calls `javac` with the given files
-pub fn compile_all(files: &[String]) -> Result<(), ()> {
-    for file in files {
-        try!(compile(file));
+pub fn compile_all(job: &Job) -> Result<(), ()> {
+    for file in &job.files {
+        try!(compile(file, job));
     }
     Ok(())
 }
-pub fn compile(file: &str) -> Result<(), ()> {
-
-    inner::compile(file).map_err(|e| {
+pub fn compile(file: &str, job: &Job) -> Result<(), ()> {
+    msg!(Compiling, "'{}'", file);
+    inner::compile(file, job).map_err(|e| {
         match e {
             Error::JavaBinaryNotFound => {
                 msg!(
@@ -50,14 +50,14 @@ pub fn compile(file: &str) -> Result<(), ()> {
     })
 }
 
-pub fn run_first_main(files: &[String]) -> Result<(), ()> {
+pub fn run_first_main(job: &Job) -> Result<(), ()> {
     // TODO: find the first class where `main` is defined
-    let p = Path::new(&files[0]);
+    let p = Path::new(&job.files[0]);
     let class = p.file_name().and_then(|s| s.to_str()).unwrap();
     let class = strip_file_ending(class);
     let parent = p.parent().unwrap();
 
-    inner::run(class, parent).map_err(|e| {
+    inner::run(class, parent, job).map_err(|e| {
         match e {
             Error::JavaBinaryNotFound => {
                 msg!(

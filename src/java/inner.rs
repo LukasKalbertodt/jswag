@@ -2,12 +2,15 @@ use std::process::{Command, ExitStatus};
 use std::path::Path;
 use std::io;
 use super::{JAVAC_NAME, JAVA_NAME};
+use job::Job;
 
 
-/// Calls `javac` with the given files
-pub fn compile(file: &str) -> Result<(), Error> {
+/// Calls `javac` with the given file
+pub fn compile(file: &str, job: &Job) -> Result<(), Error> {
     // Print what we are about to do
-    msg!(Running, "`{} {}`", JAVAC_NAME, file);
+    if job.verbose {
+        msg!(Running, "`{} {}`", JAVAC_NAME, file);
+    }
 
     // Spawn new child process
     let child = Command::new(JAVAC_NAME)
@@ -25,9 +28,14 @@ pub fn compile(file: &str) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn run<P: AsRef<Path>>(class: &str, path: P) -> Result<(), Error> {
+/// Calls `java` with the given file
+pub fn run<P: AsRef<Path>>(class: &str, path: P, job: &Job)
+    -> Result<(), Error>
+{
     // Print what we are about to do
-    msg!(Running, "`{} {}`", JAVA_NAME, class);
+    if job.verbose {
+        msg!(Running, "`{} {}`", JAVA_NAME, class);
+    }
 
     // Spawn new child process
     let child = Command::new(JAVA_NAME)

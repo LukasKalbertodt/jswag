@@ -23,7 +23,7 @@ pub fn handle(job: Job) {
                     );
                 }
 
-                if java::compile_all(&job.files).is_err() {
+                if java::compile_all(&job).is_err() {
                     msg!(Aborting, "due to previous errors");
                     msg!(None, "run `jswag` again with `--verbose` or `-v` to \
                         obtain additional information.");
@@ -39,7 +39,7 @@ pub fn handle(job: Job) {
                     );
                 }
 
-                if java::run_first_main(&job.files).is_err() {
+                if java::run_first_main(&job).is_err() {
                     msg!(Aborting, "due to previous errors");
                     msg!(None, "run `jswag` again with `--verbose` or `-v` to \
                         obtain additional information.");
