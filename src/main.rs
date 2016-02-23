@@ -3,14 +3,13 @@ extern crate rustc_serialize;
 extern crate xswag_base as base;
 extern crate xswag_syntax_java as syntax;
 extern crate term_painter;
-#[macro_use]
-extern crate lazy_static;
 
 use docopt::Docopt;
 use term_painter::{Attr, Color, ToStyle};
 
 #[macro_use]
 mod ui;
+
 mod args;
 mod config;
 mod dispatch;
