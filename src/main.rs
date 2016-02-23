@@ -7,24 +7,16 @@ extern crate term_painter;
 extern crate lazy_static;
 
 use docopt::Docopt;
-use std::sync::atomic::AtomicBool;
 use term_painter::{Attr, Color, ToStyle};
 
 #[macro_use]
-mod util;
+mod ui;
 mod args;
 mod dispatch;
 mod java;
 mod job;
 
 use job::Job;
-
-
-/// We store globally if the `--verbose` flag was set. This might change later
-/// on, since it doesn't scale well and is ugly. Easy for now, though.
-lazy_static! {
-    static ref VERBOSE: AtomicBool = AtomicBool::new(true);
-}
 
 fn main() {
     use args::Args;
@@ -65,6 +57,5 @@ fn main() {
     };
 
     // execute the job
-    println!("Handling job: {:#?}", job);
     dispatch::handle(job);
 }

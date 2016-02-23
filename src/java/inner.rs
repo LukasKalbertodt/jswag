@@ -7,9 +7,7 @@ use super::{JAVAC_NAME, JAVA_NAME};
 /// Calls `javac` with the given files
 pub fn compile(file: &str) -> Result<(), Error> {
     // Print what we are about to do
-    verbose! {{
-        executing!("`{} {}`", JAVAC_NAME, file);
-    }}
+    msg!(Running, "`{} {}`", JAVAC_NAME, file);
 
     // Spawn new child process
     let child = Command::new(JAVAC_NAME)
@@ -29,9 +27,7 @@ pub fn compile(file: &str) -> Result<(), Error> {
 
 pub fn run<P: AsRef<Path>>(class: &str, path: P) -> Result<(), Error> {
     // Print what we are about to do
-    verbose! {{
-        executing!("`{} {}`", JAVA_NAME, class);
-    }}
+    msg!(Running, "`{} {}`", JAVA_NAME, class);
 
     // Spawn new child process
     let child = Command::new(JAVA_NAME)

@@ -23,21 +23,24 @@ pub fn compile(file: &str) -> Result<(), ()> {
     inner::compile(file).map_err(|e| {
         match e {
             Error::JavaBinaryNotFound => {
-                error!(
+                msg!(
+                    Error,
                     "`{1}` was not found on the system. Make sure that `{1}` \
                         is installed and in your PATH. Aborting.",
                     JAVAC_NAME
                 );
             },
             Error::JavacFailure(status) => {
-                error!(
+                msg!(
+                    Error,
                     "`{}` exited with a non-success status ({}). Aborting.",
                     JAVAC_NAME,
                     status
                 );
             },
             Error::Io(e) => {
-                error!(
+                msg!(
+                    Error,
                     "an IO error occured while executing `{}`: {}. Aborting.",
                     JAVAC_NAME,
                     e
@@ -57,21 +60,24 @@ pub fn run_first_main(files: &[String]) -> Result<(), ()> {
     inner::run(class, parent).map_err(|e| {
         match e {
             Error::JavaBinaryNotFound => {
-                error!(
+                msg!(
+                    Error,
                     "`{1}` was not found on the system. Make sure that `{1}` \
                         is installed and in your PATH. Aborting.",
                     JAVA_NAME
                 );
             },
             Error::JavacFailure(status) => {
-                error!(
+                msg!(
+                    Error,
                     "`{}` exited with a non-success status ({}). Aborting.",
                     JAVA_NAME,
                     status
                 );
             },
             Error::Io(e) => {
-                error!(
+                msg!(
+                    Error,
                     "an IO error occured while executing `{}`: {}. Aborting.",
                     JAVA_NAME,
                     e
