@@ -8,10 +8,10 @@ use std::collections::VecDeque;
 /// further down the stack to be available in many places.
 #[derive(Clone, Debug)]
 pub struct Job {
-    sub_jobs: VecDeque<JobType>,
-    files: Vec<String>,
-
-    verbose: bool,
+    // TODO: maybe we should use a normal `Vec`
+    pub sub_jobs: VecDeque<JobType>,
+    pub files: Vec<String>,
+    pub verbose: bool,
 }
 
 impl Job {

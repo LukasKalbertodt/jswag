@@ -7,12 +7,13 @@ extern crate term_painter;
 extern crate lazy_static;
 
 use docopt::Docopt;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use term_painter::{Attr, Color, ToStyle};
 
 #[macro_use]
 mod util;
 mod args;
+mod dispatch;
 mod java;
 mod job;
 
@@ -22,7 +23,7 @@ use job::Job;
 /// We store globally if the `--verbose` flag was set. This might change later
 /// on, since it doesn't scale well and is ugly. Easy for now, though.
 lazy_static! {
-    static ref VERBOSE: AtomicBool = AtomicBool::new(false);
+    static ref VERBOSE: AtomicBool = AtomicBool::new(true);
 }
 
 fn main() {
@@ -54,47 +55,16 @@ fn main() {
         return;
     }
 
-    let job = Job::from_args(args);
+    // Check validity of args and compose them into a job object
+    let job = match Job::from_args(args) {
+        None => {
+            println!("Abort due to CLI parameter errors...");
+            return;
+        },
+        Some(j) => j,
+    };
 
-    // // ----- Now we have to decide what actions to execute -------------------
-    // // TODO: filter/check file list
-    // // First main action: parse Java file ourselves (`--check`)
-    // if args.flag_check || !args.arg_analyze.is_empty() {
-    //     verbose! {{
-    //         println!(
-    //             "{} parsing & checking files [--check]",
-    //             Color::Green.bold().paint("> Starting action:")
-    //         );
-    //     }}
-    // }
-
-    // // Second main action: pass through to `javac` (`--pass-through`)
-    // if args.flag_pass_through {
-    //     verbose! {{
-    //         println!(
-    //             "{} passing files to `javac` [--pass-through]",
-    //             Color::Green.bold().paint("> Starting action:")
-    //         );
-    //     }}
-
-    //     if java::compile_all(&args.arg_file).is_err() {
-    //         note!("run `jswag` again with `--verbose` to obtain additional \
-    //             information.");
-    //     }
-    // }
-
-    // // Third main action: run compiled files (`--run`)
-    // if args.flag_run {
-    //     verbose! {{
-    //         println!(
-    //             "{} running [--run]",
-    //             Color::Green.bold().paint("> Starting action:")
-    //         );
-    //     }}
-
-    //     if java::run_first_main(&args.arg_file).is_err() {
-    //         note!("run `jswag` again with `--verbose` to obtain additional \
-    //             information.");
-    //     }
-    // }
+    // execute the job
+    println!("Handling job: {:#?}", job);
+    dispatch::handle(job);
 }
