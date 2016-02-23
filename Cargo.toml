@@ -17,4 +17,4 @@ branch = "master"
 
 [dependencies.xswag-base]
 git = "https://github.com/LukasKalbertodt/xswag-base"
-branch = "pre-rel"
+branch = "master"
