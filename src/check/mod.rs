@@ -4,8 +4,11 @@ use std::fs::File;
 use base::{code, diag};
 use syntax;
 
+#[derive(Debug)]
 pub enum Error {
     Io(io::Error),
+    // CriticalReport(diag::Report),
+    Unknown,
 }
 
 impl From<io::Error> for Error {
@@ -28,7 +31,8 @@ pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
                         },
                         _ => msg!(Error, "IO error: {:?}", e),
                     }
-                }
+                },
+                _ => println!("{:?}", e),
             };
             return Err(());
         }
@@ -36,12 +40,12 @@ pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
     Ok(vec![])
 }
 
-fn check_file(job: &Job, file: &str) -> Result<(), Error> {
-    let mut file = try!(File::open(file));
+fn check_file(job: &Job, file_name: &str) -> Result<(), Error> {
+    let mut file = try!(File::open(file_name));
     let mut src = String::new();
     try!(file.read_to_string(&mut src));
 
-    let file_map = code::FileMap::new("PlayExample.java", src);
+    let file_map = code::FileMap::new(file_name, src);
     let (res, errors) = syntax::parse_compilation_unit(&file_map);
 
     if let Err(e) = res.as_ref() {
@@ -52,6 +56,11 @@ fn check_file(job: &Job, file: &str) -> Result<(), Error> {
         diag::print(&e, &file_map, diag::PrintOptions::default());
     }
 
+
     // res.map(|_| ()).map_err(|_| ())
-    Ok(())
+    if res.is_err() || !errors.is_empty() {
+        Err(Error::Unknown)
+    } else {
+        Ok(())
+    }
 }

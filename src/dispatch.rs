@@ -3,7 +3,7 @@ use java;
 use check;
 
 
-pub fn handle(job: Job) {
+pub fn handle(job: Job) -> Result<(), ()> {
     for sj in &job.sub_jobs {
         match *sj {
             JobType::Check => {
@@ -16,7 +16,7 @@ pub fn handle(job: Job) {
                 }
                 let res = check::check_all(&job);
                 if res.is_err() {
-                    break;
+                    return Err(());
                 }
             },
             JobType::PassThrough => {
@@ -32,7 +32,7 @@ pub fn handle(job: Job) {
                     msg!(Aborting, "due to previous errors");
                     msg!(None, "run `jswag` again with `--verbose` or `-v` to \
                         obtain additional information.");
-                    break;
+                    return Err(());
                 }
             },
             JobType::Run => {
@@ -48,7 +48,7 @@ pub fn handle(job: Job) {
                     msg!(Aborting, "due to previous errors");
                     msg!(None, "run `jswag` again with `--verbose` or `-v` to \
                         obtain additional information.");
-                    break;
+                    return Err(());
                 }
             }
             ref sj => {
@@ -56,4 +56,6 @@ pub fn handle(job: Job) {
             }
         }
     }
+
+    Ok(())
 }

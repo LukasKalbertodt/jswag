@@ -66,5 +66,8 @@ fn main() {
     };
 
     // execute the job
-    dispatch::handle(job);
+    let res = dispatch::handle(job);
+    if res.is_err() {
+        std::process::exit(config::EXIT_GENERIC_ERROR);
+    }
 }
