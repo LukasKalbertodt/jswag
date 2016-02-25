@@ -11,6 +11,7 @@ use term_painter::{Attr, Color, ToStyle};
 mod ui;
 
 mod args;
+mod check;
 mod config;
 mod dispatch;
 mod java;

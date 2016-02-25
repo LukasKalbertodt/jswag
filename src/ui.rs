@@ -12,6 +12,7 @@ pub enum MessageType {
     Warning,
 
     // action
+    Checking,
     Compiling,
     Running,
     Ignoring,
@@ -33,6 +34,7 @@ impl fmt::Display for MessageType {
             MessageType::Error => ("Error", Red.bold()),
             MessageType::Warning => ("Warning", Yellow.to_style()),
             MessageType::Aborting => ("Aborting", Magenta.bold()),
+            MessageType::Checking => ("Checking", status_style),
             MessageType::Compiling => ("Compiling", status_style),
             MessageType::Running => ("Running", status_style),
             MessageType::Ignoring => ("Ignoring", White.bold()),

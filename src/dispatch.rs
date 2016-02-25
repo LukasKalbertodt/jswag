@@ -1,5 +1,6 @@
 use job::{Job, JobType};
 use java;
+use check;
 
 
 pub fn handle(job: Job) {
@@ -12,6 +13,10 @@ pub fn handle(job: Job) {
                         "Starting batch checking of {} file(s) [--check]",
                         job.files.len()
                     );
+                }
+                let res = check::check_all(&job);
+                if res.is_err() {
+                    break;
                 }
             },
             JobType::PassThrough => {
