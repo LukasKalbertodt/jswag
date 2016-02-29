@@ -21,9 +21,14 @@ Actions:
                                     the order they were given. Requires `-p`.
 
 Options:
-    -h, --help      Show this message.
-    -v, --verbose   More verbose messages.
-    -V, --version   Show the version of jswag.
+    --lossy-decoding        Replace invalid UTF-8 or UTF-16 characters in the
+                            input file with 'U+FFFD REPLACEMENT CHARACTER' (�)
+                            instead of exiting.
+    --encoding <encoding>   Forces a specific file decoding. Valid
+                            values: 'utf8' [default: utf8]
+    -h, --help              Show this message.
+    -v, --verbose           More verbose messages.
+    -V, --version           Show the version of jswag.
 ";
 
 #[derive(Debug, RustcDecodable)]
@@ -32,11 +37,20 @@ pub struct Args {
     pub cmd_run: bool,
     pub arg_file: Vec<String>,
     pub arg_analyze: Vec<String>,
+    pub flag_encoding: Encoding,
     pub flag_check: bool,
     pub flag_pass_through: bool,
     pub flag_run: bool,
     pub flag_verbose: bool,
     pub flag_version: bool,
+    pub flag_lossy_decoding: bool,
+}
+
+#[derive(Clone, Copy, RustcDecodable, Debug)]
+pub enum Encoding {
+    Utf8,
+    // TODO: fucking encoding
+    // Utf16,
 }
 
 // TODO: add this

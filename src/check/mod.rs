@@ -3,10 +3,13 @@ use job::Job;
 use std::fs::File;
 use base::{code, diag};
 use syntax;
+use std;
+use args::Encoding;
 
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
+    Utf8(std::str::Utf8Error),
     // CriticalReport(diag::Report),
     Unknown,
 }
@@ -14,6 +17,11 @@ pub enum Error {
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
         Error::Io(e)
+    }
+}
+impl From<std::string::FromUtf8Error> for Error {
+    fn from(e: std::string::FromUtf8Error) -> Error {
+        Error::Utf8(e.utf8_error())
     }
 }
 
@@ -32,6 +40,11 @@ pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
                         _ => msg!(Error, "IO error: {:?}", e),
                     }
                 },
+                Error::Utf8(e) => {
+                    msg!(Error, "File '{}' doesn't contain valid UTF-8 ({})", file, e);
+                    msg!(Note, "Convert your file into valid UTF-8 or use the \
+                        flag `--lossy-decoding`")
+                },
                 _ => println!("{:?}", e),
             };
             return Err(());
@@ -41,10 +54,41 @@ pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
 }
 
 fn check_file(job: &Job, file_name: &str) -> Result<(), Error> {
+    // read file contents into buffer
     let mut file = try!(File::open(file_name));
-    let mut src = String::new();
-    try!(file.read_to_string(&mut src));
+    let mut buffer = Vec::new();
+    try!(file.read_to_end(&mut buffer));
 
+    // try to decode input stream as Unicode
+    let src = match job.encoding {
+        Encoding::Utf8 => {
+            if job.lossy_decoding {
+                String::from_utf8_lossy(&buffer).into_owned()
+            } else {
+                try!(String::from_utf8(buffer))
+            }
+        },
+        // TODO: fucking encoding
+        // Encoding::Utf16 => {
+        //     // check endianess
+        //     if buffer.len() < 2 {
+
+        //     }
+        //     let be_bom = match (buffer[0], buffer[1]) {
+        //         (0xFE, 0xFF) => Some(true),
+        //         (0xFF, 0xFE) => Some(false),
+        //         _ => None,
+        //     };
+
+        //     if job.lossy_decoding {
+        //         String::from_utf16_lossy(&buffer)
+        //     } else {
+        //         try!(String::from_utf16(&buffer))
+        //     }
+        // },
+    };
+
+    // create filemap and parse
     let file_map = code::FileMap::new(file_name, src);
     let (res, errors) = syntax::parse_compilation_unit(&file_map);
 

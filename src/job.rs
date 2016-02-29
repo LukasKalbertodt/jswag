@@ -1,4 +1,4 @@
-use args::Args;
+use args::{Args, Encoding};
 use std::collections::VecDeque;
 
 /// A job description to be executed.
@@ -12,6 +12,8 @@ pub struct Job {
     pub sub_jobs: VecDeque<JobType>,
     pub files: Vec<String>,
     pub verbose: bool,
+    pub lossy_decoding: bool,
+    pub encoding: Encoding,
 }
 
 impl Job {
@@ -20,6 +22,9 @@ impl Job {
             sub_jobs: VecDeque::new(),
             files: args.arg_file,
             verbose: args.flag_verbose,
+            lossy_decoding: args.flag_lossy_decoding,
+            encoding: args.flag_encoding,
+            // encoding: Encoding::Utf8,
         };
 
         // Matching flag, implying flags or implying commands
