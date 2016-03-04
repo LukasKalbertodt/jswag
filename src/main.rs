@@ -1,4 +1,5 @@
 extern crate docopt;
+extern crate env_logger;
 extern crate rustc_serialize;
 extern crate xswag_base as base;
 extern crate xswag_syntax_java as syntax;
@@ -21,6 +22,8 @@ use job::Job;
 
 fn main() {
     use args::Args;
+
+    env_logger::init().unwrap();
 
     // If there are no command line parameters, we print a nice message without
     // telling docopt.

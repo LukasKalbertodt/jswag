@@ -90,19 +90,18 @@ fn check_file(job: &Job, file_name: &str) -> Result<(), Error> {
 
     // create filemap and parse
     let file_map = code::FileMap::new(file_name, src);
-    let (res, errors) = syntax::parse_compilation_unit(&file_map);
+    let (ast, errors) = syntax::parse_compilation_unit(&file_map);
 
-    if let Err(e) = res.as_ref() {
-        diag::print(&e, &file_map, diag::PrintOptions::default());
-    }
-
+    let mut critical = false;
     for e in &errors {
         diag::print(&e, &file_map, diag::PrintOptions::default());
+
+        if e.kind == diag::ReportKind::Error {
+            critical = true;
+        }
     }
 
-
-    // res.map(|_| ()).map_err(|_| ())
-    if res.is_err() || !errors.is_empty() {
+    if ast.is_none() || critical {
         Err(Error::Unknown)
     } else {
         Ok(())
