@@ -5,6 +5,7 @@ use base::{code, diag};
 use syntax;
 use std;
 use args::Encoding;
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum Error {
@@ -27,7 +28,7 @@ impl From<std::string::FromUtf8Error> for Error {
 
 pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
     for file in &job.files {
-        msg!(Checking, "'{}'", file);
+        msg!(Checking, "'{}'", file.display());
 
         let res = check_file(job, file);
         if let Err(e) = res {
@@ -35,17 +36,18 @@ pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
                 Error::Io(e) => {
                     match e.kind() {
                         io::ErrorKind::NotFound => {
-                            msg!(Error, "File not found: {}", file);
+                            msg!(Error, "File not found: {}", file.display());
                         },
                         _ => msg!(Error, "IO error: {:?}", e),
                     }
                 },
                 Error::Utf8(e) => {
-                    msg!(Error, "File '{}' doesn't contain valid UTF-8 ({})", file, e);
+                    msg!(Error, "File '{}' doesn't contain valid UTF-8 ({})", file.display(), e);
                     msg!(Note, "Convert your file into valid UTF-8 or use the \
                         flag `--lossy-decoding`")
                 },
-                _ => println!("{:?}", e),
+                Error::Unknown => {},
+                // _ => println!("{:?}", e),
             };
             return Err(());
         }
@@ -53,7 +55,7 @@ pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
     Ok(vec![])
 }
 
-fn check_file(job: &Job, file_name: &str) -> Result<(), Error> {
+fn check_file(job: &Job, file_name: &Path) -> Result<(), Error> {
     // read file contents into buffer
     let mut file = try!(File::open(file_name));
     let mut buffer = Vec::new();
@@ -89,7 +91,8 @@ fn check_file(job: &Job, file_name: &str) -> Result<(), Error> {
     };
 
     // create filemap and parse
-    let file_map = code::FileMap::new(file_name, src);
+    let lossy_filename = file_name.to_string_lossy().into_owned();
+    let file_map = code::FileMap::new(lossy_filename, src);
     let (ast, errors) = syntax::parse_compilation_unit(&file_map);
 
     let mut critical = false;

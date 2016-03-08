@@ -6,10 +6,10 @@ use job::Job;
 
 
 /// Calls `javac` with the given file
-pub fn compile(file: &str, job: &Job) -> Result<(), Error> {
+pub fn compile(file: &Path, job: &Job) -> Result<(), Error> {
     // Print what we are about to do
     if job.verbose {
-        msg!(Running, "`{} {}`", JAVAC_NAME, file);
+        msg!(Running, "`{} {}`", JAVAC_NAME, file.display());
     }
 
     // Spawn new child process

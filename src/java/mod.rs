@@ -18,8 +18,8 @@ pub fn compile_all(job: &Job) -> Result<(), ()> {
     }
     Ok(())
 }
-pub fn compile(file: &str, job: &Job) -> Result<(), ()> {
-    msg!(Compiling, "'{}'", file);
+pub fn compile(file: &Path, job: &Job) -> Result<(), ()> {
+    msg!(Compiling, "'{}'", file.display());
     inner::compile(file, job).map_err(|e| {
         match e {
             Error::JavaBinaryNotFound => {

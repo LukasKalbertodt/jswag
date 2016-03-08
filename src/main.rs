@@ -62,7 +62,7 @@ fn main() {
     // Check validity of args and compose them into a job object
     let job = match Job::from_args(args) {
         None => {
-            println!("Abort due to CLI parameter errors...");
+            msg!(Error,"Abort due to invalid input (check CLI parameters)...");
             std::process::exit(config::EXIT_INVALID_INPUT);
         },
         Some(j) => j,
