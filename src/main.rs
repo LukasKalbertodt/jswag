@@ -11,6 +11,7 @@ use term_painter::{Attr, Color, ToStyle};
 #[macro_use]
 mod ui;
 
+mod analyze;
 mod args;
 mod check;
 mod config;

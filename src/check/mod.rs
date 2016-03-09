@@ -2,7 +2,7 @@ use std::io::{self, Read};
 use job::Job;
 use std::fs::File;
 use base::{code, diag};
-use syntax;
+use syntax::{self, ast};
 use std;
 use args::Encoding;
 use std::path::Path;
@@ -26,7 +26,8 @@ impl From<std::string::FromUtf8Error> for Error {
     }
 }
 
-pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
+pub fn check_all(job: &Job) -> Result<Vec<(code::FileMap, ast::CompilationUnit)>, ()> {
+    let mut out = Vec::new();
     for file in &job.files {
         msg!(Checking, "'{}'", file.display());
 
@@ -50,12 +51,17 @@ pub fn check_all(job: &Job) -> Result<Vec<()>, ()> {
                 // _ => println!("{:?}", e),
             };
             return Err(());
+        } else {
+            out.push(res.unwrap());
         }
+
     }
-    Ok(vec![])
+    Ok(out)
 }
 
-fn check_file(job: &Job, file_name: &Path) -> Result<(), Error> {
+fn check_file(job: &Job, file_name: &Path)
+    -> Result<(code::FileMap, ast::CompilationUnit), Error>
+{
     // read file contents into buffer
     let mut file = try!(File::open(file_name));
     let mut buffer = Vec::new();
@@ -104,9 +110,8 @@ fn check_file(job: &Job, file_name: &Path) -> Result<(), Error> {
         }
     }
 
-    if ast.is_none() || critical {
-        Err(Error::Unknown)
-    } else {
-        Ok(())
+    match (ast, critical) {
+        (None, _) | (_, true) => Err(Error::Unknown),
+        (Some(ast), _) => Ok((file_map, ast)),
     }
 }

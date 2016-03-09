@@ -1,9 +1,11 @@
 use job::{Job, JobType};
 use java;
 use check;
+use analyze;
 
 
 pub fn handle(job: Job) -> Result<(), ()> {
+    let mut check_res = None;
     for sj in &job.sub_jobs {
         match *sj {
             JobType::Check => {
@@ -15,8 +17,9 @@ pub fn handle(job: Job) -> Result<(), ()> {
                     );
                 }
                 let res = check::check_all(&job);
-                if res.is_err() {
-                    return Err(());
+                match res {
+                    Err(_) => return Err(()),
+                    Ok(res) => check_res = Some(res),
                 }
             },
             JobType::PassThrough => {
@@ -50,10 +53,20 @@ pub fn handle(job: Job) -> Result<(), ()> {
                         obtain additional information.");
                     return Err(());
                 }
-            }
-            ref sj => {
-                msg!(Ignoring, "job '{:?}'", sj);
-            }
+            },
+            JobType::Analyze { .. } => {
+                if let Some(ref check_res) = check_res {
+                    for &(ref file, ref ast) in check_res {
+                        analyze::check_names(ast, file);
+                    }
+                } else {
+                    msg!(Error, "All analyses required the 'check' job!");
+                    return Err(());
+                }
+            },
+            // ref sj => {
+            //     msg!(Ignoring, "job '{:?}'", sj);
+            // }
         }
     }
 
