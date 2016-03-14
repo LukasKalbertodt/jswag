@@ -3,6 +3,10 @@ name = "jswag"
 version = "0.3.0"
 authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
 
+description = "Java style checker and static analyzer"
+repository = "https://github.com/LukasKalbertodt/jswag"
+license = "MIT"
+
 [dependencies]
 docopt = "0.6"
 env_logger = "0.3"
