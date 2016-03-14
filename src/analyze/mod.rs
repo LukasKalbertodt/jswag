@@ -1,4 +1,4 @@
-// BEWARE: low quality shit code ahead
+// BEWARE: low quality shit-code ahead
 // TODO: make americode great again
 
 use syntax::{ast};
@@ -49,7 +49,7 @@ fn check_upper_camel_case(name: &ast::Ident, context: &str, file: &code::FileMap
             format!("This {} should be written in 'UpperCamelCase'", context),
             name.span,
         ).with_remark(diag::Remark::note(
-            "Consider changing the name like shown here",
+            "Consider changing the name as shown here",
             diag::Snippet::Replace {
                 span: name.span,
                 with: new_name,
@@ -94,7 +94,7 @@ fn check_lower_camel_case(name: &ast::Ident, context: &str, file: &code::FileMap
             format!("This {} should be written in 'lowerCamelCase'", context),
             name.span,
         ).with_remark(diag::Remark::note(
-            "Consider changing the name like shown here",
+            "Consider changing the name as shown here",
             diag::Snippet::Replace {
                 span: name.span,
                 with: new_name,
