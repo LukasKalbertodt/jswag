@@ -34,13 +34,18 @@ pub fn run<P: AsRef<Path>>(class: &str, path: P, job: &Job)
 {
     // Print what we are about to do
     if job.verbose {
-        msg!(Running, "`{} {}`", JAVA_NAME, class);
+        msg!(Running,
+            "`{} {}` in working directory '{}'",
+            JAVA_NAME,
+            class,
+            path.as_ref().display()
+        );
     }
 
     // Spawn new child process
     let child = Command::new(JAVA_NAME)
                         .arg(class)
-                        .current_dir(path)
+                        // .current_dir(path)
                         .spawn();
     let mut child = try!(child);
 

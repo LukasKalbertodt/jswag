@@ -1,8 +1,8 @@
 pub const USAGE: &'static str = "
 Usage: jswag build [options] [<file>...]
        jswag run [options] [<file>...]
+       jswag raw [options] [<file>...]
        jswag [options] <file>...
-       jswag raw [<file>...]
        jswag (--help | --version)
 
 Commands:
@@ -13,11 +13,11 @@ Commands:
                 adds these parameters to the already added parameters of
                 `build`:
                     $ --run
+    raw         Does nothing automatically. Every task has to be explicitly
+                stated with command line parameters.
     <none>      For compatibility this works similar to the original `javac`
                 command. Right now it's exactly the same as 'build', except
                 that the file list musn't be empty.
-    raw         Does nothing automatically. Every task has to be explicitly
-                stated with command line parameters.
 
 Actions:
     -a <check>, --analyze <check>   Run the given check. Implies `-c`.
